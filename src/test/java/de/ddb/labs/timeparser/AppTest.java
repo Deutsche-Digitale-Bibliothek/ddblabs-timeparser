@@ -21,6 +21,8 @@ import de.ddb.labs.timeparser.timespan.TimeSpan;
 import de.ddb.labs.timeparser.timespan.TimeSpanParser;
 import java.util.List;
 import java.util.Map;
+import lombok.AccessLevel;
+import lombok.RequiredArgsConstructor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,7 +34,15 @@ public class AppTest {
     @Test
     @DisplayName("Parses canonical ISO-like input into facet and day-range payload")
     public void parsesSimpleInput() {
-        assertEquals("time_18000 -7304949|-7304949", TimeParser.getInstance().parseTime("-20000-02-21"));
+        assertEquals("time_18000 -5583373|-5583373", TimeParser.getInstance().parseTime("-20000-02-21"));
+    }
+
+    @Test
+    @DisplayName("Supports legacy day-index output via explicit parse overload")
+    public void parsesSimpleInputWithLegacyIndexDaysMode() {
+        assertEquals(
+            "time_18000 -7304949|-7304949",
+            TimeParser.getInstance().parseTime("-20000-02-21", TimeParser.IndexDaysMode.LEGACY));
     }
 
     @Test
@@ -229,6 +239,7 @@ public class AppTest {
         return replacements;
     }
 
+    @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     private static final class RuleCsvEntry {
         private final int lineNumber;
         private final String inputMask;
@@ -237,16 +248,5 @@ public class AppTest {
         private final String outputMask;
         private final String outputPattern;
         private final String outputExample;
-
-        private RuleCsvEntry(int lineNumber, String inputMask, String inputPattern, String inputExample,
-            String outputMask, String outputPattern, String outputExample) {
-            this.lineNumber = lineNumber;
-            this.inputMask = inputMask;
-            this.inputPattern = inputPattern;
-            this.inputExample = inputExample;
-            this.outputMask = outputMask;
-            this.outputPattern = outputPattern;
-            this.outputExample = outputExample;
-        }
     }
 }

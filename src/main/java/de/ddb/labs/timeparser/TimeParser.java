@@ -28,6 +28,7 @@ import de.ddb.labs.timeparser.rule.RuleReader;
 import de.ddb.labs.timeparser.timespan.TimeSpan;
 import de.ddb.labs.timeparser.timespan.TimeSpanParser;
 import java.time.LocalDate;
+import java.time.temporal.JulianFields;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -42,6 +43,8 @@ import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
@@ -66,20 +69,37 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TimeParser {
 
+    /**
+     * Output day-index strategy used by {@code parseTime(...)}.
+     */
+    public enum IndexDaysMode {
+        /**
+         * Use Julian Day Number via {@link JulianFields#JULIAN_DAY}.
+         */
+        JULIAN_DAY,
+        /**
+         * Use the legacy era/year-of-era indexing algorithm.
+         */
+        LEGACY
+    }
+
     private static final String RULES_RESOURCE = "conf/timeparser/rules.csv";
     private static final String FACETS_RESOURCE = "conf/timeparser/facets.csv";
     private static final String EMPTY_RESULT = "";
-    private static final long MILLIS_PER_DAY = 86400000L;
-    private static final long DAYS_BETWEEN_0001_AND_1970 = 719164L;
 
     private static final TimeZone timezone = TimeZone.getTimeZone("UTC");
     private static final int DETAILED_LOG_LIMIT_PER_ERROR = 1;
     private static final int SUMMARY_LOG_EVERY_NTH_ERROR = 100;
     private static final boolean LOG_STACKTRACES = Boolean.getBoolean("timeparser.logStacktraces");
 
-    private final static List<Character> AUXILIAR_CHARS = stringToCharList(",=?/()-–.[]0acuorcfAMJhDVIZX"); // Achtung!! different kind of slashes - vs –
+    private final static List<Character> AUXILIAR_CHARS = stringToCharList(",=?/()-–.[]0acuorcfAMJhDVIZX"); // Achtung!!
+                                                                                                            // different
+                                                                                                            // kind of
+                                                                                                            // slashes -
+                                                                                                            // vs –
     private final static List<Character> DYNAMIC_CHARS = stringToCharList("#");
-    private final static List<String> PERIOD_RULES = Arrays.asList("Ottonisch", "Römisch", "Karolingisch", "Klassizistisch");
+    private final static List<String> PERIOD_RULES = Arrays.asList("Ottonisch", "Römisch", "Karolingisch",
+            "Klassizistisch");
 
     private static final List<Replacement> MONTH_REPLACEMENTS = new ArrayList<>();
 
@@ -149,51 +169,107 @@ public class TimeParser {
         }
     }
 
+    /**
+     * Returns the shared parser instance.
+     *
+     * @return singleton parser instance
+     */
     public static TimeParser getInstance() {
         return Holder.INSTANCE;
     }
 
+    /**
+     * Returns all loaded transformation rules.
+     *
+     * @return loaded rules
+     */
     public List<Rule> getRules() {
         return rules;
     }
 
+    /**
+     * Returns a snapshot of aggregated parse error counters.
+     *
+     * @return immutable map keyed by error type
+     */
     public Map<String, ParseErrorStats> getErrorStats() {
         Map<String, ParseErrorStats> snapshot = new HashMap<>();
         for (Map.Entry<String, ParseErrorCounter> entry : parseErrorCounters.entrySet()) {
             ParseErrorCounter counter = entry.getValue();
             snapshot.put(entry.getKey(), new ParseErrorStats(
-                counter.getCount(),
-                counter.getFirstContext(),
-                counter.getFirstInput(),
-                counter.getLastContext(),
-                counter.getLastInput(),
-                counter.getLastMessage()));
+                    counter.getCount(),
+                    counter.getFirstContext(),
+                    counter.getFirstInput(),
+                    counter.getLastContext(),
+                    counter.getLastInput(),
+                    counter.getLastMessage()));
         }
         return Collections.unmodifiableMap(snapshot);
     }
 
+    /**
+     * Clears all aggregated parse error counters.
+     */
     public void resetErrorStats() {
         parseErrorCounters.clear();
     }
 
+    /**
+     * Parses input using default settings (no context id, Julian Day output index).
+     *
+     * @param input textual date/time expression
+     * @return parsed output or empty string on parse failure
+     */
     public String parseTime(String input) {
-        return parseTime(input, null);
+        return parseTime(input, null, IndexDaysMode.JULIAN_DAY);
     }
 
+    /**
+     * Parses input with an explicit day-index mode and no context id.
+     *
+     * @param input         textual date/time expression
+     * @param indexDaysMode output day-index strategy
+     * @return parsed output or empty string on parse failure
+     */
+    public String parseTime(String input, IndexDaysMode indexDaysMode) {
+        return parseTime(input, null, indexDaysMode);
+    }
+
+    /**
+     * Parses input with optional context id using Julian Day output index.
+     *
+     * @param input     textual date/time expression
+     * @param contextId optional correlation id for logging/monitoring
+     * @return parsed output or empty string on parse failure
+     */
     public String parseTime(String input, String contextId) {
+        return parseTime(input, contextId, IndexDaysMode.JULIAN_DAY);
+    }
+
+    /**
+     * Parses input with optional context id and explicit day-index mode.
+     *
+     * @param input         textual date/time expression
+     * @param contextId     optional correlation id for logging/monitoring
+     * @param indexDaysMode output day-index strategy
+     * @return parsed output or empty string on parse failure
+     */
+    public String parseTime(String input, String contextId, IndexDaysMode indexDaysMode) {
         if (input == null || input.isEmpty()) {
             return EMPTY_RESULT;
         }
 
+        IndexDaysMode mode = indexDaysMode == null ? IndexDaysMode.JULIAN_DAY : indexDaysMode;
+
         try {
-            return doParseTime(input, contextId);
+            return doParseTime(input, contextId, mode);
         } catch (Exception e) {
             logParseFailure(contextId, input, e.getMessage(), e);
         }
         return EMPTY_RESULT;
     }
 
-    private String doParseTime(String input, String contextId) throws Exception {
+    private String doParseTime(String input, String contextId, IndexDaysMode indexDaysMode) throws Exception {
         final List<Rule> matchingRules = findRulesForInput(input);
         if (matchingRules.size() > 1) {
             logParseFailure(contextId, input, "Multiple rules found for input string \"" + input + "\"", null);
@@ -212,7 +288,8 @@ public class TimeParser {
         // LOG.info("Timespan: {}", timeSpan);
 
         // Create the final output string.
-        final String finalOutput = createFacetString(timeSpan) + " " + createDaysFromZeroString(timeSpan);
+        final String finalOutput = createFacetString(timeSpan) + " "
+                + createDaysFromZeroString(timeSpan, indexDaysMode);
 
         return finalOutput;
     }
@@ -229,18 +306,19 @@ public class TimeParser {
             if (contextId == null || contextId.isEmpty()) {
                 log.warn("TimeParser failed (type={}, count={}) for input [{}]: {}", errorType, count, input, message);
             } else {
-                log.warn("TimeParser failed (type={}, count={}) for context [{}], input [{}]: {}", errorType, count, contextId, input, message);
+                log.warn("TimeParser failed (type={}, count={}) for context [{}], input [{}]: {}", errorType, count,
+                        contextId, input, message);
             }
         } else if (shouldLogSummary) {
             log.warn(
-                "TimeParser error summary (type={}, count={}): firstContext=[{}], firstInput=[{}], lastContext=[{}], lastInput=[{}], lastMessage=[{}]",
-                errorType,
-                count,
-                counter.getFirstContext(),
-                counter.getFirstInput(),
-                counter.getLastContext(),
-                counter.getLastInput(),
-                counter.getLastMessage());
+                    "TimeParser error summary (type={}, count={}): firstContext=[{}], firstInput=[{}], lastContext=[{}], lastInput=[{}], lastMessage=[{}]",
+                    errorType,
+                    count,
+                    counter.getFirstContext(),
+                    counter.getFirstInput(),
+                    counter.getLastContext(),
+                    counter.getLastInput(),
+                    counter.getLastMessage());
         }
 
         if (exception != null && LOG_STACKTRACES && log.isDebugEnabled() && (shouldLogDetailed || shouldLogSummary)) {
@@ -267,7 +345,9 @@ public class TimeParser {
         return exception.getClass().getSimpleName();
     }
 
+    @Getter
     private static final class ParseErrorCounter {
+        @Getter(AccessLevel.NONE)
         private final AtomicInteger count = new AtomicInteger();
         private volatile String firstContext = "-";
         private volatile String firstInput = "-";
@@ -295,45 +375,26 @@ public class TimeParser {
         int getCount() {
             return count.get();
         }
-
-        String getFirstContext() {
-            return firstContext;
-        }
-
-        String getFirstInput() {
-            return firstInput;
-        }
-
-        String getLastContext() {
-            return lastContext;
-        }
-
-        String getLastInput() {
-            return lastInput;
-        }
-
-        String getLastMessage() {
-            return lastMessage;
-        }
     }
 
+    /**
+     * Immutable snapshot entry for aggregated parse errors.
+     */
     @Getter
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     public static final class ParseErrorStats {
+        /** Number of occurrences for this error type. */
         private final int count;
+        /** First observed context id, or {@code -} if none. */
         private final String firstContext;
+        /** First observed input, or {@code -} if none. */
         private final String firstInput;
+        /** Last observed context id, or {@code -} if none. */
         private final String lastContext;
+        /** Last observed input, or {@code -} if none. */
         private final String lastInput;
+        /** Last observed error message, or {@code -} if none. */
         private final String lastMessage;
-
-        private ParseErrorStats(int count, String firstContext, String firstInput, String lastContext, String lastInput, String lastMessage) {
-            this.count = count;
-            this.firstContext = firstContext;
-            this.firstInput = firstInput;
-            this.lastContext = lastContext;
-            this.lastInput = lastInput;
-            this.lastMessage = lastMessage;
-        }
     }
 
     /**
@@ -345,7 +406,8 @@ public class TimeParser {
         final List<Token> inputPattern = patternParser.parse(rule.getInputMask(), rule.getInputPattern());
 
         // Parse the input string.
-        final InputParser inputParser = new InputParser(inputPattern, TimeParser.MONTH_REPLACEMENTS, TimeParser.WEEKDAY_REPLACEMENTS);
+        final InputParser inputParser = new InputParser(inputPattern, TimeParser.MONTH_REPLACEMENTS,
+                TimeParser.WEEKDAY_REPLACEMENTS);
         final List<TokenWithValue> parsedInputTokens = inputParser.parseInputString(input);
 
         // Compile the output mask and output pattern into an (also) output pattern.
@@ -402,18 +464,20 @@ public class TimeParser {
         return !((maskChar == '#' && !Character.isDigit(inputChar))
                 || (Character.isSpaceChar(maskChar) && !Character.isSpaceChar(inputChar)) // Spaces should match
                 || (!Character.isSpaceChar(maskChar) && Character.isSpaceChar(inputChar)) // Spaces should match
-                || (AUXILIAR_CHARS.contains(maskChar) && maskChar != inputChar) // auxiliar chars are expected to be the same
-                || (DYNAMIC_CHARS.contains(maskChar) && maskChar == inputChar)); // dynamic chars are expected to be a value
+                || (AUXILIAR_CHARS.contains(maskChar) && maskChar != inputChar) // auxiliar chars are expected to be the
+                                                                                // same
+                || (DYNAMIC_CHARS.contains(maskChar) && maskChar == inputChar)); // dynamic chars are expected to be a
+                                                                                 // value
     }
 
     private boolean isInputPassingBasicChecks(String input, String ruleInputMask) {
         // Lengths should be the same with and without blank spaces
         if (ruleInputMask.length() != input.length()
-                || ruleInputMask.replaceAll("\\s", "").length()
-                != input.replaceAll("\\s", "").length()) {
+                || ruleInputMask.replaceAll("\\s", "").length() != input.replaceAll("\\s", "").length()) {
             return false;
         }
-        // If the rule is one of the period literals, we expect the input to be exactly the same
+        // If the rule is one of the period literals, we expect the input to be exactly
+        // the same
         return !(PERIOD_RULES.contains(ruleInputMask) && !input.equals(ruleInputMask));
     }
 
@@ -483,12 +547,23 @@ public class TimeParser {
         return facetString.toString();
     }
 
-    private String createDaysFromZeroString(TimeSpan timeSpan) {
-        final long startDays = getDateAsIndexDays(timeSpan.getStartDate());
-        // LOG.info("Timespan (Start): {} - {}", DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getStart()), startDays);
-        final long endDays = getDateAsIndexDays(timeSpan.getEndDate());
-        // LOG.info("Timespan (End): {} - {}", DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getEnd()), endDays);
+    private String createDaysFromZeroString(TimeSpan timeSpan, IndexDaysMode indexDaysMode) {
+        final long startDays = toIndexDays(timeSpan.getStartDate(), indexDaysMode);
+        // LOG.info("Timespan (Start): {} - {}",
+        // DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getStart()),
+        // startDays);
+        final long endDays = toIndexDays(timeSpan.getEndDate(), indexDaysMode);
+        // LOG.info("Timespan (End): {} - {}",
+        // DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getEnd()),
+        // endDays);
         return startDays + "|" + endDays;
+    }
+
+    private long toIndexDays(LocalDate date, IndexDaysMode indexDaysMode) {
+        if (indexDaysMode == IndexDaysMode.LEGACY) {
+            return getDateAsIndexDays(date);
+        }
+        return getJulianDayAsIndexDays(date);
     }
 
     private int toFacetYear(LocalDate date) {
@@ -496,6 +571,15 @@ public class TimeParser {
         return year > 0 ? year : year - 1;
     }
 
+    private long getJulianDayAsIndexDays(LocalDate date) {
+        return date.getLong(JulianFields.JULIAN_DAY);
+    }
+
+    /**
+     * @deprecated Kept for compatibility and reference only. Uses the historical
+     *             era/year-of-era indexing model.
+     */
+    @Deprecated(since = "2.0.0", forRemoval = false)
     private long getDateAsIndexDays(LocalDate date) {
         final Calendar temp = new GregorianCalendar(timezone);
         temp.clear();
@@ -505,22 +589,16 @@ public class TimeParser {
         boolean isAnnoDomini = prolepticYear > 0;
         int yearOfEra = isAnnoDomini ? prolepticYear : (1 - prolepticYear);
 
-        // Keep historical day indexing stable by using the same era/year-of-era model as before.
+        // Keep historical day indexing stable by using the same era/year-of-era model
+        // as before.
         temp.set(Calendar.ERA, isAnnoDomini ? GregorianCalendar.AD : GregorianCalendar.BC);
         temp.set(Calendar.YEAR, yearOfEra);
         temp.set(Calendar.MONTH, date.getMonthValue() - 1);
         temp.set(Calendar.DAY_OF_MONTH, date.getDayOfMonth());
 
-        long days = temp.getTimeInMillis() / MILLIS_PER_DAY;
-        days += DAYS_BETWEEN_0001_AND_1970;
-
-//        LOG.info("Temp. Date: {} (ISO), {} (ms), {} (days), {} (timestamp)", 
-//                DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(temp),
-//                temp.getTimeInMillis(),
-//                (days-719164),
-//                days
-//        );
-        // starts)
+        long days = temp.getTimeInMillis() / 86400000L; // 1000*60*60*24 (approximate number of milliseconds per day)
+        days += 719164; // approximate number of days from 0001-01-01 to 1970-01-01 (this is where
+                        // getTimeInMillis
         return days;
     }
 

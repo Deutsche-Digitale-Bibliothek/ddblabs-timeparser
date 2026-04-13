@@ -33,7 +33,7 @@ public class Example {
 Expected output:
 
 ```text
-time_18000 -7304949|-7304949
+time_18000 -5583373|-5583373
 ```
 
 ## Parsing, Error Handling, and Logging
