@@ -70,12 +70,7 @@ jobs:
     needs: publish
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
 
     steps:
       - name: Check out repository
@@ -91,14 +86,10 @@ jobs:
       - name: Generate JavaDocs
         run: ./mvnw --batch-mode javadoc:javadoc
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload JavaDocs artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Publish JavaDocs to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
         with:
-          path: target/site/apidocs
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: target/site/apidocs
+          force_orphan: true
