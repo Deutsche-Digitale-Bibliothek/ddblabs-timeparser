@@ -1,3 +1,18 @@
+/* 
+ * Copyright 2012-2026 Deutsche Digitale Bibliothek
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package de.ddb.labs.timeparser.timespan;
 
 import java.util.Arrays;
@@ -29,7 +44,7 @@ public class TimeSpanParser
     public TimeSpan parse(String inputString) throws IllegalStateException {
         InputStringReader input = new InputStringReader(inputString);
         Position position = new Position();
-        TimeSpan timeSpan = parseComplex(input, position);
+        TimeSpan timeSpan = parseComplex(input, position, true);
 
         if ( timeSpan == null ) {
             throw new IllegalStateException("The input string \"" + inputString + "\" could not be parsed");
@@ -40,26 +55,61 @@ public class TimeSpanParser
         }
     }
 
-    private TimeSpan parseComplex(InputStringReader input, Position startingPosition) {
+    private TimeSpan parseComplex(InputStringReader input, Position startingPosition, boolean allowEraSuffix) {
         Position p = startingPosition.copy();
         TimeSpan timeSpan = parseSimple(input, p);
 
+        if ( timeSpan == null ) {
+            return null;
+        }
+
         Position p2 = p.copy();
-        if ( timeSpan != null ) {
-            Operator operator = parseOperator(input, p2);
-            if ( operator != null ) {
-                TimeSpan nextTimeSpan = parseComplex(input, p2);
-                if ( nextTimeSpan != null ) {
-                    startingPosition.update(p2);
-                    return new TimeSpan(timeSpan.getParsedInputString()
+        Operator operator = parseOperator(input, p2);
+        if ( operator != null ) {
+            TimeSpan nextTimeSpan = parseComplex(input, p2, false);
+            if ( nextTimeSpan != null ) {
+                if ( operator.getType() == Operator.OperatorType.OR ) {
+                    throw new IllegalStateException("Disjoint time spans are not supported: \""
+                        + timeSpan.getParsedInputString()
                         + operator.getParsedInputString()
-                        + nextTimeSpan.getParsedInputString(), timeSpan.getStart(), nextTimeSpan.getEnd());
+                        + nextTimeSpan.getParsedInputString()
+                        + "\"");
                 }
+
+                timeSpan = new TimeSpan(timeSpan.getParsedInputString()
+                    + operator.getParsedInputString()
+                    + nextTimeSpan.getParsedInputString(), timeSpan.getStart(), nextTimeSpan.getEnd());
+                p = p2;
             }
         }
 
+        if ( allowEraSuffix ) {
+            timeSpan = applyEraSuffix(input, p, timeSpan);
+        }
         startingPosition.update(p);
         return timeSpan;
+    }
+
+    private TimeSpan applyEraSuffix(InputStringReader input, Position position, TimeSpan timeSpan) {
+        AcceptResult acceptResult = input.tryToAccept(position, " nach Christus");
+        if ( acceptResult.isAccepted() ) {
+            return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(), timeSpan.getStart(), timeSpan.getEnd());
+        }
+
+        acceptResult = input.tryToAccept(position, " vor Christus");
+        if ( acceptResult.isAccepted() ) {
+            return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(),
+                copyCalendarWithEra(timeSpan.getStart(), GregorianCalendar.BC),
+                copyCalendarWithEra(timeSpan.getEnd(), GregorianCalendar.BC));
+        }
+
+        return timeSpan;
+    }
+
+    private Calendar copyCalendarWithEra(Calendar source, int era) {
+        GregorianCalendar calendar = new GregorianCalendar(source.get(Calendar.YEAR), source.get(Calendar.MONTH), source.get(Calendar.DAY_OF_MONTH));
+        calendar.set(Calendar.ERA, era);
+        return calendar;
     }
 
     private Operator parseOperator(InputStringReader input, Position startingPosition) {
@@ -228,39 +278,10 @@ public class TimeSpanParser
 
     private TimeSpan parseDate(InputStringReader input, Position startingPosition) {
         TimeSpan timeSpan = null;
-        AcceptResult a;
 
         timeSpan = parseCenturyOrMillennium(input, startingPosition);
         if ( timeSpan == null ) {
             timeSpan = parseYMD(input, startingPosition);
-        }
-
-        if ( timeSpan != null ) {
-            a = input.tryToAccept(startingPosition, " nach Christus");
-            if ( a.isAccepted() ) {
-                timeSpan =
-                    new TimeSpan(
-                        timeSpan.getParsedInputString() + a.getParsedInputString(),
-                        timeSpan.getStart(),
-                        timeSpan.getEnd());
-            }
-
-            a = input.tryToAccept(startingPosition, " vor Christus");
-            if ( a.isAccepted() ) {
-                Calendar startCalBC =
-                    new GregorianCalendar(timeSpan.getEnd().get(Calendar.YEAR), timeSpan.getStart().get(
-                        Calendar.MONTH), timeSpan.getStart().get(Calendar.DAY_OF_MONTH));
-                startCalBC.set(Calendar.ERA, GregorianCalendar.BC);
-                Calendar endCalBC =
-                    new GregorianCalendar(timeSpan.getStart().get(Calendar.YEAR), timeSpan.getEnd().get(
-                        Calendar.MONTH), timeSpan.getEnd().get(Calendar.DAY_OF_MONTH));
-                endCalBC.set(Calendar.ERA, GregorianCalendar.BC);
-                timeSpan =
-                    new TimeSpan(
-                        timeSpan.getParsedInputString() + a.getParsedInputString(),
-                        startCalBC,
-                        endCalBC);
-            }
         }
 
         return timeSpan;

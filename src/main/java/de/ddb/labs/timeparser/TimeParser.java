@@ -1,3 +1,18 @@
+/* 
+ * Copyright 2012-2026 Deutsche Digitale Bibliothek
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package de.ddb.labs.timeparser;
 
 import de.ddb.labs.timeparser.data.Outputter;
@@ -12,15 +27,20 @@ import de.ddb.labs.timeparser.rule.Rule;
 import de.ddb.labs.timeparser.rule.RuleReader;
 import de.ddb.labs.timeparser.timespan.TimeSpan;
 import de.ddb.labs.timeparser.timespan.TimeSpanParser;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -44,8 +64,14 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class TimeParser {
 
+    private static final String RULES_RESOURCE = "conf/timeparser/rules.csv";
+    private static final String FACETS_RESOURCE = "conf/timeparser/facets.csv";
+    private static final String EMPTY_RESULT = "";
+
     private static final TimeZone timezone = TimeZone.getTimeZone("UTC");
-    private static final int MAX_ERROR_COUNT = 100;
+    private static final int DETAILED_LOG_LIMIT_PER_ERROR = 1;
+    private static final int SUMMARY_LOG_EVERY_NTH_ERROR = 100;
+    private static final boolean LOG_STACKTRACES = Boolean.getBoolean("timeparser.logStacktraces");
 
     private final static List<Character> AUXILIAR_CHARS = stringToCharList(",=?/()-–.[]0acuorcfAMJhDVIZX"); // Achtung!! different kind of slashes - vs –
     private final static List<Character> DYNAMIC_CHARS = stringToCharList("#");
@@ -98,7 +124,7 @@ public class TimeParser {
     private static List<Rule> rules;
     private static List<Facet> facets;
 
-    private static int errorCounter;
+    private static final ConcurrentMap<String, ParseErrorCounter> parseErrorCounters = new ConcurrentHashMap<>();
 
     private static class Holder {
 
@@ -110,13 +136,10 @@ public class TimeParser {
      */
     private TimeParser() {
         try {
-            final File rulesFile = new File("conf/timeparser/rules.csv");
-            final File facetsFile = new File("conf/timeparser/facets.csv");
+            rules = new RuleReader().read(RULES_RESOURCE, "UTF-8");
+            facets = new FacetReader().read(FACETS_RESOURCE, "UTF-8");
 
-            rules = new RuleReader().read(rulesFile.toString(), "UTF-8");
-            facets = new FacetReader().read(facetsFile.toString(), "UTF-8");
-
-            errorCounter = 0;
+            parseErrorCounters.clear();
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -130,30 +153,47 @@ public class TimeParser {
         return rules;
     }
 
-    public String parseTime(String input) {
-        if (input.isEmpty()) {
-            return "";
+    public Map<String, ParseErrorStats> getErrorStats() {
+        Map<String, ParseErrorStats> snapshot = new HashMap<>();
+        for (Map.Entry<String, ParseErrorCounter> entry : parseErrorCounters.entrySet()) {
+            ParseErrorCounter counter = entry.getValue();
+            snapshot.put(entry.getKey(), new ParseErrorStats(
+                counter.getCount(),
+                counter.getFirstContext(),
+                counter.getFirstInput(),
+                counter.getLastContext(),
+                counter.getLastInput(),
+                counter.getLastMessage()));
         }
-        try {
-            return doParseTime(input);
-        } catch (Exception e) {
-            if (errorCounter < MAX_ERROR_COUNT) {
-                log.warn("TimeParser: {}", e.getMessage());
-                errorCounter++;
-            }
-        }
-        return "";
+        return Collections.unmodifiableMap(snapshot);
     }
 
-    private String doParseTime(String input) throws Exception {
+    public void resetErrorStats() {
+        parseErrorCounters.clear();
+    }
+
+    public String parseTime(String input) {
+        return parseTime(input, null);
+    }
+
+    public String parseTime(String input, String contextId) {
+        if (input == null || input.isEmpty()) {
+            return EMPTY_RESULT;
+        }
+
+        try {
+            return doParseTime(input, contextId);
+        } catch (Exception e) {
+            logParseFailure(contextId, input, e.getMessage(), e);
+        }
+        return EMPTY_RESULT;
+    }
+
+    private String doParseTime(String input, String contextId) throws Exception {
         final List<Rule> matchingRules = findRulesForInput(input);
         if (matchingRules.size() > 1) {
-            if (errorCounter < MAX_ERROR_COUNT) {
-                final String msg = "Multiple rules found for input string \"" + input + "\"";
-                log.warn("TimeParser: {}", msg);
-                errorCounter++;
-            }
-            return "";
+            logParseFailure(contextId, input, "Multiple rules found for input string \"" + input + "\"", null);
+            return EMPTY_RESULT;
         }
 
         // Transform the input string into a normalized date string.
@@ -171,6 +211,148 @@ public class TimeParser {
         final String finalOutput = createFacetString(timeSpan) + " " + createDaysFromZeroString(timeSpan);
 
         return finalOutput;
+    }
+
+    private void logParseFailure(String contextId, String input, String message, Exception exception) {
+        String errorType = classifyErrorType(message, exception);
+        ParseErrorCounter counter = parseErrorCounters.computeIfAbsent(errorType, key -> new ParseErrorCounter());
+        int count = counter.incrementAndTrack(contextId, input, message);
+
+        boolean shouldLogDetailed = count <= DETAILED_LOG_LIMIT_PER_ERROR;
+        boolean shouldLogSummary = count % SUMMARY_LOG_EVERY_NTH_ERROR == 0;
+
+        if (shouldLogDetailed) {
+            if (contextId == null || contextId.isEmpty()) {
+                log.warn("TimeParser failed (type={}, count={}) for input [{}]: {}", errorType, count, input, message);
+            } else {
+                log.warn("TimeParser failed (type={}, count={}) for context [{}], input [{}]: {}", errorType, count, contextId, input, message);
+            }
+        } else if (shouldLogSummary) {
+            log.warn(
+                "TimeParser error summary (type={}, count={}): firstContext=[{}], firstInput=[{}], lastContext=[{}], lastInput=[{}], lastMessage=[{}]",
+                errorType,
+                count,
+                counter.getFirstContext(),
+                counter.getFirstInput(),
+                counter.getLastContext(),
+                counter.getLastInput(),
+                counter.getLastMessage());
+        }
+
+        if (exception != null && LOG_STACKTRACES && log.isDebugEnabled() && (shouldLogDetailed || shouldLogSummary)) {
+            log.debug("TimeParser parse failure details", exception);
+        }
+    }
+
+    private String classifyErrorType(String message, Exception exception) {
+        if (message != null) {
+            if (message.startsWith("Disjoint time spans are not supported:")) {
+                return "DISJOINT_TIME_SPAN";
+            }
+            if (message.startsWith("Multiple rules found for input string")) {
+                return "MULTIPLE_RULES";
+            }
+            if (message.contains("could not be parsed")) {
+                return "INVALID_TIME_EXPRESSION";
+            }
+        }
+
+        if (exception == null) {
+            return "UNKNOWN";
+        }
+        return exception.getClass().getSimpleName();
+    }
+
+    private static final class ParseErrorCounter {
+        private final AtomicInteger count = new AtomicInteger();
+        private volatile String firstContext = "-";
+        private volatile String firstInput = "-";
+        private volatile String lastContext = "-";
+        private volatile String lastInput = "-";
+        private volatile String lastMessage = "-";
+
+        int incrementAndTrack(String contextId, String input, String message) {
+            int currentCount = count.incrementAndGet();
+            String normalizedContext = (contextId == null || contextId.isEmpty()) ? "-" : contextId;
+            String normalizedInput = (input == null || input.isEmpty()) ? "-" : input;
+            String normalizedMessage = (message == null || message.isEmpty()) ? "-" : message;
+
+            if (currentCount == 1) {
+                firstContext = normalizedContext;
+                firstInput = normalizedInput;
+            }
+
+            lastContext = normalizedContext;
+            lastInput = normalizedInput;
+            lastMessage = normalizedMessage;
+            return currentCount;
+        }
+
+        int getCount() {
+            return count.get();
+        }
+
+        String getFirstContext() {
+            return firstContext;
+        }
+
+        String getFirstInput() {
+            return firstInput;
+        }
+
+        String getLastContext() {
+            return lastContext;
+        }
+
+        String getLastInput() {
+            return lastInput;
+        }
+
+        String getLastMessage() {
+            return lastMessage;
+        }
+    }
+
+    public static final class ParseErrorStats {
+        private final int count;
+        private final String firstContext;
+        private final String firstInput;
+        private final String lastContext;
+        private final String lastInput;
+        private final String lastMessage;
+
+        private ParseErrorStats(int count, String firstContext, String firstInput, String lastContext, String lastInput, String lastMessage) {
+            this.count = count;
+            this.firstContext = firstContext;
+            this.firstInput = firstInput;
+            this.lastContext = lastContext;
+            this.lastInput = lastInput;
+            this.lastMessage = lastMessage;
+        }
+
+        public int getCount() {
+            return count;
+        }
+
+        public String getFirstContext() {
+            return firstContext;
+        }
+
+        public String getFirstInput() {
+            return firstInput;
+        }
+
+        public String getLastContext() {
+            return lastContext;
+        }
+
+        public String getLastInput() {
+            return lastInput;
+        }
+
+        public String getLastMessage() {
+            return lastMessage;
+        }
     }
 
     /**
@@ -314,7 +496,7 @@ public class TimeParser {
             }
         }
         if (facetTokens.isEmpty()) {
-            return "";
+            return EMPTY_RESULT;
         } else {
             for (String facetToken : facetTokens) {
                 if (facetString.length() > 0) {

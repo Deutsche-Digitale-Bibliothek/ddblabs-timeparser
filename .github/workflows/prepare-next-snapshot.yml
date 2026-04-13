@@ -1,0 +1,59 @@
+name: Prepare Next Snapshot
+
+on:
+  workflow_run:
+    workflows:
+      - Build and Publish
+    types:
+      - completed
+
+jobs:
+  bump-version:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'release' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Calculate next snapshot version
+        id: version
+        run: |
+          VERSION=$(./mvnw --batch-mode -q -DforceStdout help:evaluate -Dexpression=project.version)
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            echo "next_version=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+          if [[ -z "$MAJOR" || -z "$MINOR" || -z "$PATCH" ]]; then
+            echo "Unsupported version format: $VERSION"
+            exit 1
+          fi
+
+          NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))-SNAPSHOT"
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Update pom version
+        if: ${{ steps.version.outputs.next_version != '' }}
+        run: ./mvnw --batch-mode versions:set -DnewVersion=${{ steps.version.outputs.next_version }} -DgenerateBackupPoms=false
+
+      - name: Commit next snapshot version
+        if: ${{ steps.version.outputs.next_version != '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pom.xml
+          git commit -m "Prepare next development iteration: ${{ steps.version.outputs.next_version }}"
+          git push origin HEAD:main
