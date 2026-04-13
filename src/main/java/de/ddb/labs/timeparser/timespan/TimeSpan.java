@@ -15,16 +15,21 @@
  */
 package de.ddb.labs.timeparser.timespan;
 
+import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 
 /** A time period between two points in time. Contains the input string that was parsed to generate this period. */
 public class TimeSpan {
     private final String parsedInputString;
-    private final Calendar start;
-    private final Calendar end;
+    private final LocalDate start;
+    private final LocalDate end;
 
     public TimeSpan(String parsedInputString, Calendar start, Calendar end) {
+        this(parsedInputString, toLocalDate(start), toLocalDate(end));
+    }
+
+    public TimeSpan(String parsedInputString, LocalDate start, LocalDate end) {
         this.parsedInputString = parsedInputString;
         this.start = start;
         this.end = end;
@@ -34,24 +39,48 @@ public class TimeSpan {
         return this.parsedInputString;
     }
 
-    public Calendar getStart() {
+    public LocalDate getStartDate() {
         return this.start;
     }
 
-    public Calendar getEnd() {
+    public LocalDate getEndDate() {
         return this.end;
+    }
+
+    public Calendar getStart() {
+        return toGregorianCalendar(this.start);
+    }
+
+    public Calendar getEnd() {
+        return toGregorianCalendar(this.end);
     }
 
     @Override
     public String toString() {
-        String startEra = "AD";
-        if ( this.start.get(Calendar.ERA) == GregorianCalendar.BC ) {
-            startEra = "BC";
+        String startEra = this.start.getYear() <= 0 ? "BC" : "AD";
+        String endEra = this.end.getYear() <= 0 ? "BC" : "AD";
+        return "TimeSpan[" + this.start + " (" + startEra + ") - " + this.end + " (" + endEra + "), \"" + this.parsedInputString + "\"]";
+    }
+
+    private static LocalDate toLocalDate(Calendar calendar) {
+        int year = calendar.get(Calendar.YEAR);
+        if (calendar.get(Calendar.ERA) == GregorianCalendar.BC) {
+            year = 1 - year;
         }
-        String endEra = "AD";
-        if ( this.end.get(Calendar.ERA) == GregorianCalendar.BC ) {
-            endEra = "BC";
+        int month = calendar.get(Calendar.MONTH) + 1;
+        int day = calendar.get(Calendar.DAY_OF_MONTH);
+        return LocalDate.of(year, month, day);
+    }
+
+    private static GregorianCalendar toGregorianCalendar(LocalDate date) {
+        int prolepticYear = date.getYear();
+        boolean isAD = prolepticYear > 0;
+        int yearOfEra = isAD ? prolepticYear : (1 - prolepticYear);
+
+        GregorianCalendar calendar = new GregorianCalendar(yearOfEra, date.getMonthValue() - 1, date.getDayOfMonth());
+        if (!isAD) {
+            calendar.set(Calendar.ERA, GregorianCalendar.BC);
         }
-        return "TimeSpan[" + this.start.getTime() + " (" + startEra + ") - " + this.end.getTime() + " (" + endEra + "), \"" + this.parsedInputString + "\"]";
+        return calendar;
     }
 }
