@@ -78,7 +78,7 @@ public class TimeSpanParser
 
                 timeSpan = new TimeSpan(timeSpan.getParsedInputString()
                     + operator.getParsedInputString()
-                    + nextTimeSpan.getParsedInputString(), timeSpan.getStart(), nextTimeSpan.getEnd());
+                    + nextTimeSpan.getParsedInputString(), timeSpan.getStartDate(), nextTimeSpan.getEndDate());
                 p = p2;
             }
         }
@@ -93,7 +93,7 @@ public class TimeSpanParser
     private TimeSpan applyEraSuffix(InputStringReader input, Position position, TimeSpan timeSpan) {
         AcceptResult acceptResult = input.tryToAccept(position, " nach Christus");
         if ( acceptResult.isAccepted() ) {
-            return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(), timeSpan.getStart(), timeSpan.getEnd());
+            return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(), timeSpan.getStartDate(), timeSpan.getEndDate());
         }
 
         acceptResult = input.tryToAccept(position, " vor Christus");

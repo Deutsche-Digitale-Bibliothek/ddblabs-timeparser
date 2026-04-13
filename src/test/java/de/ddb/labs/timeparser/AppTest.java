@@ -15,10 +15,10 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import de.ddb.labs.timeparser.timespan.TimeSpan;
 import de.ddb.labs.timeparser.timespan.TimeSpanParser;
-import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -40,10 +40,8 @@ public class AppTest {
     public void parsesBcDateSuffixForWholeRange() {
         TimeSpan timeSpan = new TimeSpanParser().parse("100/101 vor Christus");
 
-        assertEquals(GregorianCalendar.BC, timeSpan.getStart().get(java.util.Calendar.ERA));
-        assertEquals(100, timeSpan.getStart().get(java.util.Calendar.YEAR));
-        assertEquals(GregorianCalendar.BC, timeSpan.getEnd().get(java.util.Calendar.ERA));
-        assertEquals(101, timeSpan.getEnd().get(java.util.Calendar.YEAR));
+        assertEquals(LocalDate.of(-99, 1, 1), timeSpan.getStartDate());
+        assertEquals(LocalDate.of(-100, 12, 31), timeSpan.getEndDate());
     }
 
     @Test

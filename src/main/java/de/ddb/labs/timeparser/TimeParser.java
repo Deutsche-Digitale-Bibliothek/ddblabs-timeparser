@@ -27,6 +27,7 @@ import de.ddb.labs.timeparser.rule.Rule;
 import de.ddb.labs.timeparser.rule.RuleReader;
 import de.ddb.labs.timeparser.timespan.TimeSpan;
 import de.ddb.labs.timeparser.timespan.TimeSpanParser;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -67,6 +68,8 @@ public class TimeParser {
     private static final String RULES_RESOURCE = "conf/timeparser/rules.csv";
     private static final String FACETS_RESOURCE = "conf/timeparser/facets.csv";
     private static final String EMPTY_RESULT = "";
+    private static final long MILLIS_PER_DAY = 86400000L;
+    private static final long DAYS_BETWEEN_0001_AND_1970 = 719164L;
 
     private static final TimeZone timezone = TimeZone.getTimeZone("UTC");
     private static final int DETAILED_LOG_LIMIT_PER_ERROR = 1;
@@ -481,14 +484,8 @@ public class TimeParser {
     private String createFacetString(TimeSpan timeSpan) {
         StringBuilder facetString = new StringBuilder("");
         List<String> facetTokens = new ArrayList<>();
-        int startYear = timeSpan.getStart().get(Calendar.YEAR);
-        int endYear = timeSpan.getEnd().get(Calendar.YEAR);
-        if (timeSpan.getStart().get(Calendar.ERA) == GregorianCalendar.BC) {
-            startYear *= -1;
-        }
-        if (timeSpan.getEnd().get(Calendar.ERA) == GregorianCalendar.BC) {
-            endYear *= -1;
-        }
+        int startYear = toFacetYear(timeSpan.getStartDate());
+        int endYear = toFacetYear(timeSpan.getEndDate());
         for (Facet facet : facets) {
             if ((startYear <= facet.getLatestDate()) && (endYear >= facet.getEarliestDate())
                     && !facetTokens.contains(facet.getNotation())) {
@@ -509,27 +506,35 @@ public class TimeParser {
     }
 
     private String createDaysFromZeroString(TimeSpan timeSpan) {
-        final long startDays = getCalendarAsIndexDays(timeSpan.getStart());
+        final long startDays = getDateAsIndexDays(timeSpan.getStartDate());
         // LOG.info("Timespan (Start): {} - {}", DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getStart()), startDays);
-        final long endDays = getCalendarAsIndexDays(timeSpan.getEnd());
+        final long endDays = getDateAsIndexDays(timeSpan.getEndDate());
         // LOG.info("Timespan (End): {} - {}", DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(timeSpan.getEnd()), endDays);
         return startDays + "|" + endDays;
     }
 
-    private long getCalendarAsIndexDays(Calendar calendar) {
+    private int toFacetYear(LocalDate date) {
+        int year = date.getYear();
+        return year > 0 ? year : year - 1;
+    }
+
+    private long getDateAsIndexDays(LocalDate date) {
         final Calendar temp = new GregorianCalendar(timezone);
-        calendar.get(Calendar.ERA);
         temp.clear();
         temp.setLenient(false);
 
-        // ERA unbedingt übernehmen!
-        temp.set(Calendar.ERA, calendar.get(Calendar.ERA));
-        temp.set(Calendar.YEAR, calendar.get(Calendar.YEAR));
-        temp.set(Calendar.MONTH, calendar.get(Calendar.MONTH));
-        temp.set(Calendar.DAY_OF_MONTH, calendar.get(Calendar.DAY_OF_MONTH));
+        int prolepticYear = date.getYear();
+        boolean isAnnoDomini = prolepticYear > 0;
+        int yearOfEra = isAnnoDomini ? prolepticYear : (1 - prolepticYear);
 
-        long days = temp.getTimeInMillis() / 86400000L; // 1000*60*60*24 (approximate number of milliseconds per day)
-        days += 719164; // approximate number of days from 0001-01-01 to 1970-01-01 (this is where getTimeInMillis
+        // Keep historical day indexing stable by using the same era/year-of-era model as before.
+        temp.set(Calendar.ERA, isAnnoDomini ? GregorianCalendar.AD : GregorianCalendar.BC);
+        temp.set(Calendar.YEAR, yearOfEra);
+        temp.set(Calendar.MONTH, date.getMonthValue() - 1);
+        temp.set(Calendar.DAY_OF_MONTH, date.getDayOfMonth());
+
+        long days = temp.getTimeInMillis() / MILLIS_PER_DAY;
+        days += DAYS_BETWEEN_0001_AND_1970;
 
 //        LOG.info("Temp. Date: {} (ISO), {} (ms), {} (days), {} (timestamp)", 
 //                DateFormatUtils.ISO_8601_EXTENDED_DATETIME_TIME_ZONE_FORMAT.format(temp),
