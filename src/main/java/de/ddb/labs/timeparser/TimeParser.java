@@ -42,6 +42,7 @@ import java.util.TimeZone;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -316,6 +317,7 @@ public class TimeParser {
         }
     }
 
+    @Getter
     public static final class ParseErrorStats {
         private final int count;
         private final String firstContext;
@@ -331,30 +333,6 @@ public class TimeParser {
             this.lastContext = lastContext;
             this.lastInput = lastInput;
             this.lastMessage = lastMessage;
-        }
-
-        public int getCount() {
-            return count;
-        }
-
-        public String getFirstContext() {
-            return firstContext;
-        }
-
-        public String getFirstInput() {
-            return firstInput;
-        }
-
-        public String getLastContext() {
-            return lastContext;
-        }
-
-        public String getLastInput() {
-            return lastInput;
-        }
-
-        public String getLastMessage() {
-            return lastMessage;
         }
     }
 

@@ -15,6 +15,9 @@
  */
 package de.ddb.labs.timeparser.timespan;
 
+import lombok.Getter;
+
+@Getter
 public class Operator {
 
     private final String parsedInputString;
@@ -29,11 +32,4 @@ public class Operator {
         this.type = type;
     }
 
-    public String getParsedInputString() {
-        return this.parsedInputString;
-    }
-
-    public OperatorType getType() {
-        return this.type;
-    }
 }

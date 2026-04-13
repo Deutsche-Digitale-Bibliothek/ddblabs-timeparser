@@ -15,6 +15,9 @@
  */
 package de.ddb.labs.timeparser.timespan;
 
+import lombok.Getter;
+
+@Getter
 public class CenturyMillenniumLimitation {
 
     private final String parsedInputString;
@@ -31,15 +34,4 @@ public class CenturyMillenniumLimitation {
         this.limitation = limitation;
     }
 
-    public String getParsedInputString() {
-        return this.parsedInputString;
-    }
-
-    public Integer getNumber() {
-        return this.number;
-    }
-
-    public LimitationType getLimitation() {
-        return this.limitation;
-    }
 }

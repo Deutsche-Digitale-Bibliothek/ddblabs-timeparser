@@ -16,35 +16,25 @@
 package de.ddb.labs.timeparser.timespan;
 
 import java.time.LocalDate;
+import lombok.Getter;
 
 /** A time period between two points in time. Contains the input string that was parsed to generate this period. */
+@Getter
 public class TimeSpan {
     private final String parsedInputString;
-    private final LocalDate start;
-    private final LocalDate end;
+    private final LocalDate startDate;
+    private final LocalDate endDate;
 
-    public TimeSpan(String parsedInputString, LocalDate start, LocalDate end) {
+    public TimeSpan(String parsedInputString, LocalDate startDate, LocalDate endDate) {
         this.parsedInputString = parsedInputString;
-        this.start = start;
-        this.end = end;
-    }
-
-    public String getParsedInputString() {
-        return this.parsedInputString;
-    }
-
-    public LocalDate getStartDate() {
-        return this.start;
-    }
-
-    public LocalDate getEndDate() {
-        return this.end;
+        this.startDate = startDate;
+        this.endDate = endDate;
     }
 
     @Override
     public String toString() {
-        String startEra = this.start.getYear() <= 0 ? "BC" : "AD";
-        String endEra = this.end.getYear() <= 0 ? "BC" : "AD";
-        return "TimeSpan[" + this.start + " (" + startEra + ") - " + this.end + " (" + endEra + "), \"" + this.parsedInputString + "\"]";
+        String startEra = this.startDate.getYear() <= 0 ? "BC" : "AD";
+        String endEra = this.endDate.getYear() <= 0 ? "BC" : "AD";
+        return "TimeSpan[" + this.startDate + " (" + startEra + ") - " + this.endDate + " (" + endEra + "), \"" + this.parsedInputString + "\"]";
     }
 }

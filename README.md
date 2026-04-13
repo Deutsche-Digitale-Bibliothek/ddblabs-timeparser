@@ -69,7 +69,7 @@ Recommended indexing behavior:
 
 Logging is grouped by error type:
 
-- First 3 occurrences per error type: detailed warning log with context and input.
+- First occurrence per error type: detailed warning log with context and input.
 - After that: summary warning every 100 occurrences.
 - Stacktraces are emitted only in debug mode for detailed/summary points.
 
