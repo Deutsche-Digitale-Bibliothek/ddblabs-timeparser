@@ -16,8 +16,8 @@
 package de.ddb.labs.timeparser.timespan;
 
 import java.util.Arrays;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.regex.Pattern;
 
@@ -99,17 +99,17 @@ public class TimeSpanParser
         acceptResult = input.tryToAccept(position, " vor Christus");
         if ( acceptResult.isAccepted() ) {
             return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(),
-                copyCalendarWithEra(timeSpan.getStart(), GregorianCalendar.BC),
-                copyCalendarWithEra(timeSpan.getEnd(), GregorianCalendar.BC));
+                copyDateWithEra(timeSpan.getStartDate(), false),
+                copyDateWithEra(timeSpan.getEndDate(), false));
         }
 
         return timeSpan;
     }
 
-    private Calendar copyCalendarWithEra(Calendar source, int era) {
-        GregorianCalendar calendar = new GregorianCalendar(source.get(Calendar.YEAR), source.get(Calendar.MONTH), source.get(Calendar.DAY_OF_MONTH));
-        calendar.set(Calendar.ERA, era);
-        return calendar;
+    private LocalDate copyDateWithEra(LocalDate source, boolean isAnnoDomini) {
+        int yearOfEra = source.getYear() > 0 ? source.getYear() : (1 - source.getYear());
+        int prolepticYear = isAnnoDomini ? yearOfEra : (1 - yearOfEra);
+        return LocalDate.of(prolepticYear, source.getMonthValue(), source.getDayOfMonth());
     }
 
     private Operator parseOperator(InputStringReader input, Position startingPosition) {
@@ -148,7 +148,7 @@ public class TimeSpanParser
             if ( a.isAccepted() ) {
                 TimeSpan originalDate = parseDate(input, p);
                 if ( originalDate != null ) {
-                    List<Calendar> modifiedStartEnd = getModifiedStartEnd(originalDate, range);
+                    List<LocalDate> modifiedStartEnd = getModifiedStartEnd(originalDate, range);
                     startingPosition.update(p);
                     return new TimeSpan(range.getParsedInputString()
                         + a.getParsedInputString()
@@ -160,89 +160,53 @@ public class TimeSpanParser
         return parseDate(input, startingPosition);
     }
     
-    private List<Calendar> getModifiedStartEnd(TimeSpan originalDate, Range range) {
-        Calendar modifiedStart = null;
-        Calendar modifiedEnd = null;
+    private List<LocalDate> getModifiedStartEnd(TimeSpan originalDate, Range range) {
+        LocalDate originalStart = originalDate.getStartDate();
+        LocalDate originalEnd = originalDate.getEndDate();
+        LocalDate modifiedStart = null;
+        LocalDate modifiedEnd = null;
 
         if ( range.getType() == Range.RangeType.FROM ) { // ab, seit                  
-            int date = originalDate.getStart().get(Calendar.YEAR);
+            int date = getYearOfEra(originalStart);
             int delta = getDateDelta(date);
 
-            modifiedStart =
-                new GregorianCalendar(
-                    originalDate.getStart().get(Calendar.YEAR),
-                    originalDate.getStart().get(Calendar.MONTH),
-                    originalDate.getStart().get(Calendar.DAY_OF_MONTH));
-
-            modifiedEnd =
-                new GregorianCalendar(
-                    originalDate.getEnd().get(Calendar.YEAR) + delta,
-                    originalDate.getEnd().get(Calendar.MONTH),
-                    originalDate.getEnd().get(Calendar.DAY_OF_MONTH));
+            modifiedStart = originalStart;
+            modifiedEnd = originalEnd.plusYears(delta);
 
         } else if ( range.getType() == Range.RangeType.UNTIL ) { // bis
-            int date = originalDate.getStart().get(Calendar.YEAR);
+            int date = getYearOfEra(originalStart);
             int delta = getDateDelta(date);
 
-            modifiedStart =
-                new GregorianCalendar(
-                    originalDate.getStart().get(Calendar.YEAR) - delta,
-                    originalDate.getStart().get(Calendar.MONTH),
-                    originalDate.getStart().get(Calendar.DAY_OF_MONTH));
-            
-            modifiedEnd =
-                new GregorianCalendar(
-                    originalDate.getEnd().get(Calendar.YEAR),
-                    originalDate.getEnd().get(Calendar.MONTH),
-                    originalDate.getEnd().get(Calendar.DAY_OF_MONTH));
+            modifiedStart = originalStart.minusYears(delta);
+            modifiedEnd = originalEnd;
 
         } else if ( range.getType() == Range.RangeType.BEFORE ) { // vor
-            int date = originalDate.getStart().get(Calendar.YEAR);
+            int date = getYearOfEra(originalStart);
             int delta = getDateDelta(date);
 
-            modifiedStart =
-                new GregorianCalendar(
-                    originalDate.getStart().get(Calendar.YEAR) - delta,
-                    originalDate.getStart().get(Calendar.MONTH),
-                    originalDate.getStart().get(Calendar.DAY_OF_MONTH));
-            
-            modifiedEnd =
-                new GregorianCalendar(
-                    originalDate.getStart().get(Calendar.YEAR),
-                    originalDate.getStart().get(Calendar.MONTH),
-                    originalDate.getStart().get(Calendar.DAY_OF_MONTH) - 1);
+            modifiedStart = originalStart.minusYears(delta);
+            modifiedEnd = originalStart.minusDays(1);
 
         } else if ( range.getType() == Range.RangeType.AROUND ) {
             int delta = 0;
-            if ( originalDate.getStart().get(Calendar.YEAR) >= 1900 ) {
+            if ( getYearOfEra(originalStart) >= 1900 ) {
                 delta = 1;
-            } else if ( originalDate.getStart().get(Calendar.YEAR) >= 1700 ) {
+            } else if ( getYearOfEra(originalStart) >= 1700 ) {
                 delta = 2;
-            } else if ( originalDate.getStart().get(Calendar.YEAR) >= 1000 ) {
+            } else if ( getYearOfEra(originalStart) >= 1000 ) {
                 delta = 5;
             } else {
                 delta = 10;
             }
 
-            modifiedStart =
-                new GregorianCalendar(
-                    originalDate.getStart().get(Calendar.YEAR) - delta,
-                    originalDate.getStart().get(Calendar.MONTH),
-                    originalDate.getStart().get(Calendar.DAY_OF_MONTH));
-            modifiedEnd =
-                new GregorianCalendar(
-                    originalDate.getEnd().get(Calendar.YEAR) + delta,
-                    originalDate.getEnd().get(Calendar.MONTH),
-                    originalDate.getEnd().get(Calendar.DAY_OF_MONTH));
+            modifiedStart = originalStart.minusYears(delta);
+            modifiedEnd = originalEnd.plusYears(delta);
         } else if ( range.getType() == Range.RangeType.AFTER ) {
-            modifiedStart = originalDate.getStart();
-            modifiedEnd =
-                new GregorianCalendar(originalDate.getEnd().get(Calendar.YEAR) + 25, originalDate
-                    .getEnd()
-                    .get(Calendar.MONTH), originalDate.getEnd().get(Calendar.DAY_OF_MONTH));
+            modifiedStart = originalStart;
+            modifiedEnd = originalEnd.plusYears(25);
         } else if ( range.getType() == Range.RangeType.PRESUMABLY ) {
-            modifiedStart = originalDate.getStart();
-            modifiedEnd = originalDate.getEnd();
+            modifiedStart = originalStart;
+            modifiedEnd = originalEnd;
         }
         return Arrays.asList(modifiedStart, modifiedEnd);
     }
@@ -289,8 +253,8 @@ public class TimeSpanParser
     }
 
     private TimeSpan parseCenturyOrMillennium(InputStringReader input, Position startingPosition) {
-        Calendar start;
-        Calendar end;
+        LocalDate start;
+        LocalDate end;
 
         Position p;
         AcceptResult a;
@@ -302,7 +266,7 @@ public class TimeSpanParser
             if ( a.isAccepted() ) {
                 AcceptResult a2 = input.tryToAccept(p, PATTERN_CENTURY);
                 if ( a2.isAccepted() ) {
-                    List<Calendar> startEnd = getStartAndEnd(limitation, Integer.parseInt(a2.group(1)));
+                    List<LocalDate> startEnd = getStartAndEnd(limitation, Integer.parseInt(a2.group(1)));
                     start = startEnd.get(0);
                     end = startEnd.get(1);
 
@@ -319,8 +283,8 @@ public class TimeSpanParser
         if ( a.isAccepted() ) {
             int century = Integer.parseInt(a.group(1));
 
-            start = new GregorianCalendar((century - 1) * 100 + 1, 0, 1);
-            end = new GregorianCalendar(century * 100, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1, 1, 1);
+            end = LocalDate.of(century * 100, 12, 31);
 
             startingPosition.update(p);
             return new TimeSpan(a.getParsedInputString(), start, end);
@@ -328,50 +292,30 @@ public class TimeSpanParser
         return null;
     }
     
-    private List<Calendar> getStartAndEnd(CenturyMillenniumLimitation limitation, int century) {
-        Calendar start = null;
-        Calendar end = null;
+    private List<LocalDate> getStartAndEnd(CenturyMillenniumLimitation limitation, int century) {
+        LocalDate start = null;
+        LocalDate end = null;
         if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.DECADE ) {
-            start =
-                new GregorianCalendar(
-                    (century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 10,
-                    0,
-                    1);
-            end =
-                new GregorianCalendar((century - 1) * 100 + limitation.getNumber() * 10, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 10, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 10, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.QUARTER ) {
-            start =
-                new GregorianCalendar(
-                    (century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 25,
-                    0,
-                    1);
-            end =
-                new GregorianCalendar((century - 1) * 100 + limitation.getNumber() * 25, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 25, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 25, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.THIRD ) {
-            start =
-                new GregorianCalendar(
-                    (century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 33,
-                    0,
-                    1);
-            end =
-                new GregorianCalendar((century - 1) * 100 + limitation.getNumber() * 33, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 33, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 33, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.HALF ) {
-            start =
-                new GregorianCalendar(
-                    (century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 50,
-                    0,
-                    1);
-            end =
-                new GregorianCalendar((century - 1) * 100 + limitation.getNumber() * 50, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 50, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 50, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.START ) {
-            start = new GregorianCalendar((century - 1) * 100 + 1, 0, 1);
-            end = new GregorianCalendar((century - 1) * 100 + 15, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 1, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + 15, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.MIDDLE ) {
-            start = new GregorianCalendar((century - 1) * 100 + 45, 0, 1);
-            end = new GregorianCalendar((century - 1) * 100 + 55, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 45, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + 55, 12, 31);
         } else if ( limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.END ) {
-            start = new GregorianCalendar((century - 1) * 100 + 85, 0, 1);
-            end = new GregorianCalendar((century - 1) * 100 + 100, 11, 31);
+            start = LocalDate.of((century - 1) * 100 + 85, 1, 1);
+            end = LocalDate.of((century - 1) * 100 + 100, 12, 31);
         } else {
             start = null;
             end = null;
@@ -380,8 +324,8 @@ public class TimeSpanParser
     }
 
     private TimeSpan parseYMD(InputStringReader input, Position startingPosition) {
-        Calendar start;
-        Calendar end;
+        LocalDate start;
+        LocalDate end;
 
         Position p;
         AcceptResult a;
@@ -411,8 +355,7 @@ public class TimeSpanParser
             int month = Integer.parseInt(a.group(3));
 
             start = createGregorianCalendar(isAD, year, month - 1, 1);
-            end = createGregorianCalendar(isAD, year, month - 1, 1);
-            end.set(Calendar.DAY_OF_MONTH, end.getActualMaximum(Calendar.DAY_OF_MONTH));
+            end = LocalDate.of(start.getYear(), start.getMonthValue(), YearMonth.of(start.getYear(), start.getMonthValue()).lengthOfMonth());
 
             startingPosition.update(p);
             return new TimeSpan(a.getParsedInputString(), start, end);
@@ -451,6 +394,10 @@ public class TimeSpanParser
         return delta;
     }
 
+    private int getYearOfEra(LocalDate date) {
+        return date.getYear() > 0 ? date.getYear() : (1 - date.getYear());
+    }
+
     private CenturyMillenniumLimitation parseCenturyMillenniumLimitation(
         InputStringReader input,
         Position startingPosition) {
@@ -485,11 +432,8 @@ public class TimeSpanParser
         return null;
     }
 
-    private GregorianCalendar createGregorianCalendar(boolean isAnnoDomini, int year, int month, int day) {
-        GregorianCalendar calendar = new GregorianCalendar(year, month, day);
-        if ( !isAnnoDomini ) {
-            calendar.set(Calendar.ERA, GregorianCalendar.BC);
-        }
-        return calendar;
+    private LocalDate createGregorianCalendar(boolean isAnnoDomini, int year, int month, int day) {
+        int prolepticYear = isAnnoDomini ? year : (1 - year);
+        return LocalDate.of(prolepticYear, month + 1, day);
     }
 }
