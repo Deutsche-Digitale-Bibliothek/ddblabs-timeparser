@@ -11,7 +11,7 @@
 
     <name>timeparser</name>
     <description>Java library for parsing textual date and time expressions into machine-readable time spans.</description>
-    <url>https://github.com/mbuechner/timeparser</url>
+    <url>https://github.com/Deutsche-Digitale-Bibliothek/ddblabs-timeparser</url>
 
     <licenses>
         <license>
@@ -24,21 +24,21 @@
     <developers>
         <developer>
             <id>mbuechner</id>
-            <name>mbuechner</name>
+            <name>Michael Büchner</name>
             <url>https://github.com/mbuechner</url>
         </developer>
     </developers>
 
     <scm>
-        <connection>scm:git:https://github.com/mbuechner/timeparser.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com/mbuechner/timeparser.git</developerConnection>
-        <url>https://github.com/mbuechner/timeparser</url>
+        <connection>scm:git:https://github.com/Deutsche-Digitale-Bibliothek/ddblabs-timeparser.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/Deutsche-Digitale-Bibliothek/ddblabs-timeparser.git</developerConnection>
+        <url>https://github.com/Deutsche-Digitale-Bibliothek/ddblabs-timeparser</url>
         <tag>HEAD</tag>
     </scm>
 
     <issueManagement>
         <system>GitHub Issues</system>
-        <url>https://github.com/mbuechner/timeparser/issues</url>
+        <url>https://github.com/Deutsche-Digitale-Bibliothek/ddblabs-timeparser/issues</url>
     </issueManagement>
 
     <properties>
@@ -46,11 +46,15 @@
         <maven.compiler.release>21</maven.compiler.release>
 
         <junit.version>6.0.3</junit.version>
+        <javalin.version>7.1.0</javalin.version>
+        <jackson.version>2.20.0</jackson.version>
+        <commons.csv.version>1.14.1</commons.csv.version>
         <logback.version>1.5.32</logback.version>
         <lombok.version>1.18.44</lombok.version>
 
         <maven.compiler.plugin.version>3.15.0</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.5.5</maven.surefire.plugin.version>
+        <maven.shade.plugin.version>3.6.1</maven.shade.plugin.version>
         <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
         <maven.javadoc.plugin.version>3.12.0</maven.javadoc.plugin.version>
         <maven.gpg.plugin.version>3.2.8</maven.gpg.plugin.version>
@@ -58,6 +62,24 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>io.javalin</groupId>
+            <artifactId>javalin</artifactId>
+            <version>${javalin.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>${commons.csv.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -99,6 +121,28 @@
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.plugin.version}</version>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>${maven.shade.plugin.version}</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>shade</goal>
+                        </goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <transformers>
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                    <mainClass>de.ddb.labs.timeparser.TimeParserHttpServer</mainClass>
+                                </transformer>
+                            </transformers>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <plugin>

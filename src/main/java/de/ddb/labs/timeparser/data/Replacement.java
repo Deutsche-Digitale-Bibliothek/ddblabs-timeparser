@@ -16,7 +16,8 @@
 package de.ddb.labs.timeparser.data;
 
 /**
- * Contains a string that needs to be replaced and a string by which it should be replaced. Used to convert textual months and weekdays to numbers.
+ * Contains a string that needs to be replaced and a string by which it should
+ * be replaced. Used to convert textual months and weekdays to numbers.
  */
 public class Replacement {
     public final String from;

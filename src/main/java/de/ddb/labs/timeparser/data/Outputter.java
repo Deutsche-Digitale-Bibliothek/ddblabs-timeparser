@@ -52,11 +52,14 @@ public class Outputter {
                     throw new IllegalStateException("No input token found for variable name " + variableName);
                 }
 
-                if (outputPatternToken.getPatternValue().length() > tokensWithValuesByVariableName.get(variableName).getPatternValue().length()) {
-                    throw new IllegalStateException("Output length of variable " + variableName + " greater than input length");
+                if (outputPatternToken.getPatternValue().length() > tokensWithValuesByVariableName.get(variableName)
+                        .getPatternValue().length()) {
+                    throw new IllegalStateException(
+                            "Output length of variable " + variableName + " greater than input length");
                 }
 
-                output.append(tokensWithValuesByVariableName.get(variableName).getInputValue().substring(0, outputPatternToken.getPatternValue().length()));
+                output.append(tokensWithValuesByVariableName.get(variableName).getInputValue().substring(0,
+                        outputPatternToken.getPatternValue().length()));
             }
         }
         return output.toString();

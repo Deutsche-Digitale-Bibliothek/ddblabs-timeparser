@@ -18,7 +18,10 @@ package de.ddb.labs.timeparser.timespan;
 import java.time.LocalDate;
 import lombok.Getter;
 
-/** A time period between two points in time. Contains the input string that was parsed to generate this period. */
+/**
+ * A time period between two points in time. Contains the input string that was
+ * parsed to generate this period.
+ */
 @Getter
 public class TimeSpan {
     private final String parsedInputString;
@@ -35,6 +38,7 @@ public class TimeSpan {
     public String toString() {
         String startEra = this.startDate.getYear() <= 0 ? "BC" : "AD";
         String endEra = this.endDate.getYear() <= 0 ? "BC" : "AD";
-        return "TimeSpan[" + this.startDate + " (" + startEra + ") - " + this.endDate + " (" + endEra + "), \"" + this.parsedInputString + "\"]";
+        return "TimeSpan[" + this.startDate + " (" + startEra + ") - " + this.endDate + " (" + endEra + "), \""
+                + this.parsedInputString + "\"]";
     }
 }

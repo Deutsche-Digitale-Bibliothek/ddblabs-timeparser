@@ -19,7 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** An element in a rule's input or output specification. Created by {@link PatternParser}. */
+/**
+ * An element in a rule's input or output specification. Created by
+ * {@link PatternParser}.
+ */
 @Getter
 @EqualsAndHashCode
 @ToString

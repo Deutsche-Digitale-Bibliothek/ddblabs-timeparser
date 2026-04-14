@@ -31,7 +31,8 @@ public class Facet {
     private final String prefLabelEn;
     private final String sortOrder;
 
-    public Facet(String id, String notation, Long earliestDate, Long latestDate, String prefLabelDe, String prefLabelEn, String sortOrder) {
+    public Facet(String id, String notation, Long earliestDate, Long latestDate, String prefLabelDe, String prefLabelEn,
+            String sortOrder) {
         this.id = id;
         this.notation = notation;
         this.earliestDate = earliestDate;

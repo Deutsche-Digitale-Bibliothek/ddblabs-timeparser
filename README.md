@@ -78,3 +78,73 @@ TimeParser parser = TimeParser.getInstance();
 Map<String, TimeParser.ParseErrorStats> stats = parser.getErrorStats();
 parser.resetErrorStats();
 ```
+
+## HTTP Demo Server
+
+The project contains a minimal embedded HTTP server in `de.ddb.labs.timeparser.TimeParserHttpServer`.
+
+Build and start it locally:
+
+```bash
+./mvnw -q -DskipTests package
+TIMEPARSER_HOST=127.0.0.1 TIMEPARSER_PORT=8080 java -jar target/timeparser-2.0.0-SNAPSHOT.jar
+```
+
+Configuration:
+
+- Host: `TIMEPARSER_HOST`, default `127.0.0.1`
+- Port: `TIMEPARSER_PORT`, default `8080`
+
+Optional JVM properties are still supported:
+
+```bash
+java -Dserver.host=127.0.0.1 -Dserver.port=8080 -jar target/timeparser-2.0.0-SNAPSHOT.jar
+```
+
+Request:
+
+```text
+GET /?date=Mai%202010&indexDaysMode=JULIAN_DAY
+```
+
+Query parameters:
+
+- `date`: required input string to parse
+- `indexDaysMode`: optional, one of `JULIAN_DAY` or `LEGACY`
+- `indexDayMode`: optional legacy alias for `indexDaysMode`
+
+Example response:
+
+```json
+{
+    "input": "Mai 2010",
+    "output": "time_62100|time_62110 2455318|2455348"
+}
+```
+
+The server responds with `application/json`, sets `Vary: Accept-Encoding`, and enables gzip compression.
+
+## Docker
+
+Build the image:
+
+```bash
+docker build -t timeparser .
+```
+
+Run it:
+
+```bash
+docker run --rm -p 8080:8080 \
+    -e TIMEPARSER_HOST=0.0.0.0 \
+    -e TIMEPARSER_PORT=8080 \
+    timeparser
+```
+
+The container runs as a non-root user.
+
+Example request:
+
+```bash
+curl --compressed 'http://127.0.0.1:8080/?date=Mai%202010&indexDaysMode=JULIAN_DAY'
+```

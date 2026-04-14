@@ -18,8 +18,11 @@ package de.ddb.labs.timeparser.timespan;
 import java.util.regex.Matcher;
 
 /**
- * Indicates whether an attempt to read a certain string from the input string by {@link InputStringReader} was successful or not. If successful, the part of
- * the input string just read can be returned, as well as the groups from the regular expression, if used.
+ * Indicates whether an attempt to read a certain string from the input string
+ * by {@link InputStringReader} was successful or not. If successful, the part
+ * of
+ * the input string just read can be returned, as well as the groups from the
+ * regular expression, if used.
  */
 class AcceptResult {
 
@@ -43,11 +46,6 @@ class AcceptResult {
 
     public String group(int group) {
         return this.matcher.group(group);
-    }
-
-    @Override
-    public String toString() {
-        return "AcceptResult[" + this.isAccepted + (this.isAccepted ? ": \"" + this.parsedInputString + "\"]" : "]");
     }
 
 }

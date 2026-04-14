@@ -15,13 +15,18 @@
  */
 package de.ddb.labs.timeparser.facet;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * <p>
@@ -44,54 +49,46 @@ import java.util.List;
  * </li>
  * </ul>
  */
+@Slf4j
 public class FacetReader {
-
-    private boolean skipHashes = true;
 
     public List<Facet> read(String path, String charsetName) throws IOException, ParseException {
         ArrayList<Facet> facets = new ArrayList<>();
+        CSVFormat format = CSVFormat.DEFAULT.builder()
+                .setHeader()
+                .setSkipHeaderRecord(true)
+                .setIgnoreEmptyLines(true)
+                .setTrim(true)
+                .get();
 
         try (final InputStream in = FacetReader.class.getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
                 throw new IOException("Facet file does could not be found for the given path \"" + path + "\"");
             }
-            try (final BufferedReader reader = new BufferedReader(new InputStreamReader(in, charsetName))) {
-                int i = 0;
-                String line;
-                boolean skippedFirstLine = false;
-                while ((line = reader.readLine()) != null) {
-                    if (skippedFirstLine) {
-                        line = line.trim();
-                        if (line.length() > 0) {
-                            String[] columns = line.split("\t");
-                            if (columns.length < 7) {
-                                final String errorMsg = "Expected 7 columns instead of " + columns.length + " in facet file \"" + path + "\", line " + i + ": \"" + line + "\"";
-                                throw new ParseException(errorMsg, i);
-                            }
-
-                            try {
-                                final Facet facet = new Facet(columns[0], columns[1], Long.valueOf(columns[2]), Long.valueOf(columns[3]), columns[4], columns[5], columns[6]);
-                                facets.add(facet);
-                            } catch (Exception x) {
-                                if (!this.skipHashes) {
-                                    final String errorMsg = "Incorrect number format in facet file \"" + path + "\", line " + i + ": \"" + line + "\"";
-                                    throw new ParseException(errorMsg, i);
-                                }
-                            }
-                        }
-                    } else {
-                        skippedFirstLine = true;
+            try (final CSVParser parser = CSVParser.parse(new InputStreamReader(in, charsetName), format)) {
+                for (CSVRecord record : parser) {
+                    int lineNumber = Math.toIntExact(record.getRecordNumber());
+                    if (record.size() < 7) {
+                        final String errorMsg = "Expected 7 columns instead of " + record.size() + " in facet file \""
+                                + path + "\", line " + lineNumber + ": \"" + record + "\"";
+                        throw new ParseException(errorMsg, lineNumber);
                     }
-                    i++;
+
+                    try {
+                        final Facet facet = new Facet(record.get(0), record.get(1), Long.valueOf(record.get(2)),
+                                Long.valueOf(record.get(3)), record.get(4), record.get(5), record.get(6));
+                        facets.add(facet);
+                    } catch (NumberFormatException x) {
+                        log.warn("Skipping facet row with invalid numeric value in facet file \"{}\", line {}: {} ({})",
+                                path,
+                                lineNumber,
+                                record,
+                                x.getMessage());
+                    }
                 }
             }
         }
 
         return facets;
-    }
-
-    public List<Facet> readSkipHashFacets(String path, String charsetName) throws IOException, ParseException {
-        this.skipHashes = true;
-        return read(path, charsetName);
     }
 }
