@@ -5,7 +5,9 @@ COPY pom.xml mvnw ./
 COPY .mvn .mvn
 COPY src src
 
-RUN chmod +x mvnw && ./mvnw -q -DskipTests package
+RUN chmod +x mvnw \
+	&& ./mvnw -q -DskipTests package \
+	&& cp target/*-shaded.jar target/timeparser.jar
 
 FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
@@ -15,7 +17,7 @@ ENV TIMEPARSER_PORT=8080
 
 RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /app app
 
-COPY --from=build /workspace/target/timeparser-2.0.0-SNAPSHOT.jar /app/timeparser.jar
+COPY --from=build /workspace/target/timeparser.jar /app/timeparser.jar
 
 USER app
 EXPOSE 8080
