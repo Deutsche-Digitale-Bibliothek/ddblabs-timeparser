@@ -12,6 +12,7 @@ on:
 
 jobs:
   build:
+    name: Build and test
     runs-on: ubuntu-latest
 
     steps:
@@ -28,7 +29,8 @@ jobs:
       - name: Build and test
         run: ./mvnw --batch-mode verify
 
-  publish-snapshot:
+  publish-central-snapshot:
+    name: Publish SNAPSHOT to Maven Central
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
@@ -62,7 +64,8 @@ jobs:
         if: endsWith(steps.version.outputs.value, '-SNAPSHOT')
         run: ./mvnw --batch-mode -P central-snapshot deploy
 
-  publish:
+  publish-central-release:
+    name: Publish release to Maven Central
     if: github.event_name == 'release'
     needs: build
     runs-on: ubuntu-latest
@@ -99,10 +102,11 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to Maven Central
+      - name: Publish release to Maven Central
         run: ./mvnw --batch-mode -P release deploy
 
-  pages:
+  publish-docs:
+    name: Publish versioned JavaDocs to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -121,13 +125,76 @@ jobs:
           java-version: '21'
           cache: maven
 
+      - name: Detect project version
+        id: version
+        run: echo "value=$(./mvnw --batch-mode -q -DforceStdout help:evaluate -Dexpression=project.version)" >> "$GITHUB_OUTPUT"
+
       - name: Generate JavaDocs
         run: ./mvnw --batch-mode javadoc:javadoc
 
+      - name: Prepare versioned JavaDocs site
+        run: |
+          VERSION="${{ steps.version.outputs.value }}"
+          APIDOCS_DIR="target/reports/apidocs"
+          test -f "$APIDOCS_DIR/index.html"
+          mkdir -p target/pages
+
+          if [[ "$VERSION" == *-SNAPSHOT ]]; then
+            mkdir -p target/pages/snapshot
+            cp -r "$APIDOCS_DIR"/. target/pages/snapshot/
+            CURRENT_DOC_PATH="snapshot/"
+            CURRENT_DOC_LABEL="SNAPSHOT ($VERSION)"
+          else
+            mkdir -p target/pages/release
+            mkdir -p "target/pages/releases/$VERSION"
+            cp -r "$APIDOCS_DIR"/. target/pages/release/
+            cp -r "$APIDOCS_DIR"/. "target/pages/releases/$VERSION/"
+            CURRENT_DOC_PATH="releases/$VERSION/"
+            CURRENT_DOC_LABEL="Release $VERSION"
+          fi
+
+          cat > target/pages/index.html <<EOF
+          <!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>timeparser JavaDocs</title>
+              <style>
+                body { font-family: Arial, sans-serif; max-width: 48rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+                code { background: #f4f4f4; padding: 0.1rem 0.3rem; border-radius: 4px; }
+              </style>
+            </head>
+            <body>
+              <h1>timeparser JavaDocs</h1>
+              <p>Versioned API documentation for timeparser.</p>
+              <ul>
+                <li><a href="./snapshot/">Current SNAPSHOT docs</a></li>
+                <li><a href="./release/">Current release docs</a></li>
+                <li><a href="./${CURRENT_DOC_PATH}">This build: ${CURRENT_DOC_LABEL}</a></li>
+              </ul>
+            </body>
+          </html>
+          EOF
+
+          touch target/pages/.nojekyll
+
+      - name: Verify generated Pages content
+        run: |
+          test -f target/pages/index.html
+          test -f target/reports/apidocs/index.html
+          FILE_COUNT=$(find target/pages -type f | wc -l)
+          echo "Generated $FILE_COUNT files for GitHub Pages"
+          if [ "$FILE_COUNT" -lt 5 ]; then
+            echo "Generated Pages content looks unexpectedly empty"
+            exit 1
+          fi
+
       - name: Publish JavaDocs to gh-pages branch
+        if: github.event_name != 'pull_request'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
-          publish_dir: target/site/apidocs
-          force_orphan: true
+          publish_dir: target/pages
+          keep_files: true
