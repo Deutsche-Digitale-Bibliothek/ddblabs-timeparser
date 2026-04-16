@@ -20,8 +20,8 @@ import lombok.Getter;
 import lombok.ToString;
 
 /**
- * A transformation rule consists of an input specification, and an output
- * specification.
+ * Transformation rule mapping one textual input pattern to a normalized output
+ * pattern.
  */
 @Getter
 @EqualsAndHashCode
@@ -36,8 +36,8 @@ public class Rule {
     private final String outputExample;
     private final String test;
 
-    public Rule(String inputMask, String inputPattern, String inputExample, String outputMask, String outputPattern,
-            String outputExample, String test) {
+    public Rule(final String inputMask, final String inputPattern, final String inputExample, final String outputMask,
+            final String outputPattern, final String outputExample, final String test) {
         this.inputMask = inputMask;
         this.inputPattern = inputPattern;
         this.inputExample = inputExample;
@@ -46,5 +46,4 @@ public class Rule {
         this.outputExample = outputExample;
         this.test = test;
     }
-
 }

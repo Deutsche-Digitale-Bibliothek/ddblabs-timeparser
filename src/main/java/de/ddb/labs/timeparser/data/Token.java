@@ -28,6 +28,9 @@ import lombok.ToString;
 @ToString
 public class Token {
 
+    /**
+     * Token categories supported by the rule mask syntax.
+     */
     public enum Type {
         GENERIC_VARIABLE, MONTH_REPLACEMENT_VARIABLE, WEEKDAY_REPLACEMENT_VARIABLE, TEXT
     }
@@ -35,7 +38,7 @@ public class Token {
     protected final String patternValue;
     protected final Type type;
 
-    public Token(Type type, String patternValue) {
+    public Token(final Type type, final String patternValue) {
         this.patternValue = patternValue;
         this.type = type;
     }

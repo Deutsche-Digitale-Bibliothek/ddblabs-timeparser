@@ -15,9 +15,9 @@
  */
 package de.ddb.labs.timeparser.facet;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +35,8 @@ import lombok.extern.slf4j.Slf4j;
  * <ul>
  * <li>The first line in the file is ignored and can be used as a header
  * line.</li>
- * <li>Each line must consist of seven columns, separated by a tab character
- * (\t). The columns must correspond to the following, in the specified order:
+ * <li>Each line must consist of seven CSV columns. The columns must correspond
+ * to the following, in the specified order:
  * <ol>
  * <li>ID</li>
  * <li>Notation</li>
@@ -50,11 +50,21 @@ import lombok.extern.slf4j.Slf4j;
  * </ul>
  */
 @Slf4j
-public class FacetReader {
+public final class FacetReader {
 
-    public List<Facet> read(String path, String charsetName) throws IOException, ParseException {
-        ArrayList<Facet> facets = new ArrayList<>();
-        CSVFormat format = CSVFormat.DEFAULT.builder()
+    private FacetReader() {
+    }
+
+    /**
+     * Reads all facets from the configured classpath resource.
+     *
+     * @param path classpath-relative resource path
+     * @param charsetName character set used to decode the resource
+     * @return loaded facets, excluding malformed numeric rows
+     */
+    public static List<Facet> read(final String path, final String charsetName) throws IOException, ParseException {
+        final List<Facet> facets = new ArrayList<>();
+        final CSVFormat format = CSVFormat.DEFAULT.builder()
                 .setHeader()
                 .setSkipHeaderRecord(true)
                 .setIgnoreEmptyLines(true)
@@ -66,8 +76,8 @@ public class FacetReader {
                 throw new IOException("Facet file does could not be found for the given path \"" + path + "\"");
             }
             try (final CSVParser parser = CSVParser.parse(new InputStreamReader(in, charsetName), format)) {
-                for (CSVRecord record : parser) {
-                    int lineNumber = Math.toIntExact(record.getRecordNumber());
+                for (final CSVRecord record : parser) {
+                    final int lineNumber = Math.toIntExact(record.getRecordNumber());
                     if (record.size() < 7) {
                         final String errorMsg = "Expected 7 columns instead of " + record.size() + " in facet file \""
                                 + path + "\", line " + lineNumber + ": \"" + record + "\"";
@@ -75,15 +85,14 @@ public class FacetReader {
                     }
 
                     try {
-                        final Facet facet = new Facet(record.get(0), record.get(1), Long.valueOf(record.get(2)),
-                                Long.valueOf(record.get(3)), record.get(4), record.get(5), record.get(6));
-                        facets.add(facet);
-                    } catch (NumberFormatException x) {
+                        facets.add(new Facet(record.get(0), record.get(1), Long.valueOf(record.get(2)),
+                                Long.valueOf(record.get(3)), record.get(4), record.get(5), record.get(6)));
+                    } catch (NumberFormatException exception) {
                         log.warn("Skipping facet row with invalid numeric value in facet file \"{}\", line {}: {} ({})",
                                 path,
                                 lineNumber,
                                 record,
-                                x.getMessage());
+                                exception.getMessage());
                     }
                 }
             }

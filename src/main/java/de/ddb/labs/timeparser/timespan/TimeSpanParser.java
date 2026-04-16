@@ -15,18 +15,21 @@
  */
 package de.ddb.labs.timeparser.timespan;
 
-import java.util.Arrays;
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.List;
 import java.util.regex.Pattern;
 
 /**
  * Interprets a normalized string and determines what time period it corresponds
- * to. The implemented syntax is
- * documented elsewhere. Time periods are represented as {@link TimeSpan}s.
+ * to. The implemented syntax is documented elsewhere. Time periods are represented
+ * as {@link TimeSpan}s.
  */
 public class TimeSpanParser {
+
+    /**
+     * Lightweight holder for calculated start and end dates.
+     */
+    private record DateBounds(LocalDate start, LocalDate end) {
+    }
 
     private static final Pattern PATTERN_CENTURY = Pattern.compile("^(\\d+)\\. Jahrhundert");
     private static final Pattern PATTERN_CENTURY_MILLENNIUM_LIMITATION = Pattern
@@ -41,32 +44,43 @@ public class TimeSpanParser {
     private static final Pattern PATTERN_YM = Pattern.compile("^(-?)(\\d+)-(\\d{2})");
     private static final Pattern PATTERN_Y = Pattern.compile("^(-?)(\\d+)");
 
-    public TimeSpan parse(String inputString) throws IllegalStateException {
-        InputStringReader input = new InputStringReader(inputString);
-        Position position = new Position();
-        TimeSpan timeSpan = parseComplex(input, position, true);
+    /**
+     * Parses a normalized input string into a concrete {@link TimeSpan}.
+     *
+     * @param inputString normalized parser input
+     * @return parsed time span
+     * @throws IllegalStateException if parsing fails or leaves trailing input
+     */
+    public TimeSpan parse(final String inputString) throws IllegalStateException {
+        final InputStringReader input = new InputStringReader(inputString);
+        final Position position = new Position();
+        final TimeSpan timeSpan = parseComplex(input, position, true);
 
         if (timeSpan == null) {
             throw new IllegalStateException("The input string \"" + inputString + "\" could not be parsed");
-        } else if (timeSpan.getParsedInputString().length() != inputString.length()) {
-            throw new IllegalStateException("The input string \"" + inputString + "\" could not be parsed entirely");
-        } else {
-            return timeSpan;
         }
+        if (timeSpan.getParsedInputString().length() != inputString.length()) {
+            throw new IllegalStateException("The input string \"" + inputString + "\" could not be parsed entirely");
+        }
+        return timeSpan;
     }
 
-    private TimeSpan parseComplex(InputStringReader input, Position startingPosition, boolean allowEraSuffix) {
-        Position p = startingPosition.copy();
-        TimeSpan timeSpan = parseSimple(input, p);
+    /**
+     * Parses a full expression, including chained operators and optional era suffixes.
+     */
+    private TimeSpan parseComplex(final InputStringReader input, final Position startingPosition,
+            final boolean allowEraSuffix) {
+        Position cursor = startingPosition.copy();
+        TimeSpan timeSpan = parseSimple(input, cursor);
 
         if (timeSpan == null) {
             return null;
         }
 
-        Position p2 = p.copy();
-        Operator operator = parseOperator(input, p2);
+        final Position operatorCursor = cursor.copy();
+        final Operator operator = parseOperator(input, operatorCursor);
         if (operator != null) {
-            TimeSpan nextTimeSpan = parseComplex(input, p2, false);
+            final TimeSpan nextTimeSpan = parseComplex(input, operatorCursor, false);
             if (nextTimeSpan != null) {
                 if (operator.getType() == Operator.OperatorType.OR) {
                     throw new IllegalStateException("Disjoint time spans are not supported: \""
@@ -79,18 +93,196 @@ public class TimeSpanParser {
                 timeSpan = new TimeSpan(timeSpan.getParsedInputString()
                         + operator.getParsedInputString()
                         + nextTimeSpan.getParsedInputString(), timeSpan.getStartDate(), nextTimeSpan.getEndDate());
-                p = p2;
+                cursor = operatorCursor;
             }
         }
 
         if (allowEraSuffix) {
-            timeSpan = applyEraSuffix(input, p, timeSpan);
+            timeSpan = applyEraSuffix(input, cursor, timeSpan);
         }
-        startingPosition.update(p);
+        startingPosition.update(cursor);
         return timeSpan;
     }
 
-    private TimeSpan applyEraSuffix(InputStringReader input, Position position, TimeSpan timeSpan) {
+    /**
+     * Parses binary operators between two date expressions.
+     */
+    private Operator parseOperator(final InputStringReader input, final Position startingPosition) {
+        Position cursor = startingPosition.copy();
+        AcceptResult acceptResult = input.tryToAccept(cursor, ',');
+        if (acceptResult.isAccepted()) {
+            startingPosition.update(cursor);
+            return new Operator(acceptResult.getParsedInputString(), Operator.OperatorType.OR);
+        }
+
+        cursor = startingPosition.copy();
+        acceptResult = input.tryToAccept(cursor, '/');
+        if (acceptResult.isAccepted()) {
+            startingPosition.update(cursor);
+            return new Operator(acceptResult.getParsedInputString(), Operator.OperatorType.BETWEEN);
+        }
+
+        cursor = startingPosition.copy();
+        acceptResult = input.tryToAccept(cursor, " oder ");
+        if (acceptResult.isAccepted()) {
+            startingPosition.update(cursor);
+            return new Operator(acceptResult.getParsedInputString(), Operator.OperatorType.OR);
+        }
+
+        return null;
+    }
+
+    /**
+     * Parses a single date expression with an optional range qualifier.
+     */
+    private TimeSpan parseSimple(final InputStringReader input, final Position startingPosition) {
+        final Position cursor = startingPosition.copy();
+        final Range range = parseRange(input, cursor);
+        if (range != null) {
+            final AcceptResult separator = input.tryToAccept(cursor, ' ');
+            if (separator.isAccepted()) {
+                final TimeSpan originalDate = parseDate(input, cursor);
+                if (originalDate != null) {
+                    final DateBounds modifiedStartEnd = getModifiedStartEnd(originalDate, range);
+                    startingPosition.update(cursor);
+                    return new TimeSpan(range.getParsedInputString()
+                            + separator.getParsedInputString()
+                            + originalDate.getParsedInputString(), modifiedStartEnd.start(), modifiedStartEnd.end());
+                }
+            }
+        }
+
+        return parseDate(input, startingPosition);
+    }
+
+    /**
+     * Parses range qualifiers such as "ab", "bis" or "vermutlich".
+     */
+    private Range parseRange(final InputStringReader input, final Position startingPosition) {
+        final Position cursor = startingPosition.copy();
+        final AcceptResult acceptResult = input.tryToAccept(cursor, PATTERN_RANGE);
+        if (acceptResult.isAccepted()) {
+            startingPosition.update(cursor);
+            if (acceptResult.group(1) != null) {
+                switch (acceptResult.group(1)) {
+                    case "ab":
+                    case "seit":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.FROM);
+                    case "bis":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.UNTIL);
+                    case "vor":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.BEFORE);
+                    case "um":
+                    case "ca.":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.AROUND);
+                    case "nach":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.AFTER);
+                    case "vermutlich":
+                        return new Range(acceptResult.getParsedInputString(), Range.RangeType.PRESUMABLY);
+                    default:
+                        break;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Parses the actual date expression once optional range prefixes were handled.
+     */
+    private TimeSpan parseDate(final InputStringReader input, final Position startingPosition) {
+        TimeSpan timeSpan = parseCenturyOrMillennium(input, startingPosition);
+        if (timeSpan == null) {
+            timeSpan = parseYMD(input, startingPosition);
+        }
+        return timeSpan;
+    }
+
+    /**
+     * Parses century-based expressions such as "3. Jahrhundert" or
+     * "Mitte 3. Jahrhundert".
+     */
+    private TimeSpan parseCenturyOrMillennium(final InputStringReader input, final Position startingPosition) {
+        Position cursor = startingPosition.copy();
+        final CenturyMillenniumLimitation limitation = parseCenturyMillenniumLimitation(input, cursor);
+        if (limitation != null) {
+            final AcceptResult separator = input.tryToAccept(cursor, ' ');
+            if (separator.isAccepted()) {
+                final AcceptResult century = input.tryToAccept(cursor, PATTERN_CENTURY);
+                if (century.isAccepted()) {
+                    final DateBounds startEnd = getStartAndEnd(limitation, Integer.parseInt(century.group(1)));
+                    startingPosition.update(cursor);
+                    return new TimeSpan(limitation.getParsedInputString()
+                            + separator.getParsedInputString()
+                            + century.getParsedInputString(), startEnd.start(), startEnd.end());
+                }
+            }
+        }
+
+        cursor = startingPosition.copy();
+        final AcceptResult century = input.tryToAccept(cursor, PATTERN_CENTURY);
+        if (century.isAccepted()) {
+            final int centuryNumber = Integer.parseInt(century.group(1));
+            final LocalDate start = LocalDate.of((centuryNumber - 1) * 100 + 1, 1, 1);
+            final LocalDate end = LocalDate.of(centuryNumber * 100, 12, 31);
+
+            startingPosition.update(cursor);
+            return new TimeSpan(century.getParsedInputString(), start, end);
+        }
+
+        return null;
+    }
+
+    /**
+     * Parses numeric date forms: year, year-month, and year-month-day.
+     */
+    private TimeSpan parseYMD(final InputStringReader input, final Position startingPosition) {
+        Position cursor = startingPosition.copy();
+        AcceptResult acceptResult = input.tryToAccept(cursor, PATTERN_YMD);
+        if (acceptResult.isAccepted()) {
+            final boolean isAnnoDomini = acceptResult.group(1) == null || "".equals(acceptResult.group(1));
+            final LocalDate start = createGregorianCalendar(
+                    isAnnoDomini,
+                    Integer.parseInt(acceptResult.group(2)),
+                    Integer.parseInt(acceptResult.group(3)) - 1,
+                    Integer.parseInt(acceptResult.group(4)));
+
+            startingPosition.update(cursor);
+            return new TimeSpan(acceptResult.getParsedInputString(), start, start);
+        }
+
+        cursor = startingPosition.copy();
+        acceptResult = input.tryToAccept(cursor, PATTERN_YM);
+        if (acceptResult.isAccepted()) {
+            final boolean isAnnoDomini = acceptResult.group(1) == null || "".equals(acceptResult.group(1));
+            final int year = Integer.parseInt(acceptResult.group(2));
+            final int month = Integer.parseInt(acceptResult.group(3));
+            final LocalDate start = createGregorianCalendar(isAnnoDomini, year, month - 1, 1);
+            final LocalDate end = LocalDate.of(start.getYear(), start.getMonthValue(), start.lengthOfMonth());
+
+            startingPosition.update(cursor);
+            return new TimeSpan(acceptResult.getParsedInputString(), start, end);
+        }
+
+        cursor = startingPosition.copy();
+        acceptResult = input.tryToAccept(cursor, PATTERN_Y);
+        if (acceptResult.isAccepted()) {
+            final boolean isAnnoDomini = acceptResult.group(1) == null || "".equals(acceptResult.group(1));
+            final int year = Integer.parseInt(acceptResult.group(2));
+            final LocalDate start = createGregorianCalendar(isAnnoDomini, year, 0, 1);
+            final LocalDate end = createGregorianCalendar(isAnnoDomini, year, 11, 31);
+
+            startingPosition.update(cursor);
+            return new TimeSpan(acceptResult.group(0), start, end);
+        }
+
+        return null;
+    }
+
+    /**
+     * Appends an explicit era suffix and converts the span to BCE when required.
+     */
+    private TimeSpan applyEraSuffix(final InputStringReader input, final Position position, final TimeSpan timeSpan) {
         AcceptResult acceptResult = input.tryToAccept(position, " nach Christus");
         if (acceptResult.isAccepted()) {
             return new TimeSpan(timeSpan.getParsedInputString() + acceptResult.getParsedInputString(),
@@ -107,335 +299,157 @@ public class TimeSpanParser {
         return timeSpan;
     }
 
-    private LocalDate copyDateWithEra(LocalDate source, boolean isAnnoDomini) {
-        int yearOfEra = source.getYear() > 0 ? source.getYear() : (1 - source.getYear());
-        int prolepticYear = isAnnoDomini ? yearOfEra : (1 - yearOfEra);
-        return LocalDate.of(prolepticYear, source.getMonthValue(), source.getDayOfMonth());
+    /**
+     * Expands a concrete date span according to range qualifiers such as "ab" or "um".
+     */
+    private DateBounds getModifiedStartEnd(final TimeSpan originalDate, final Range range) {
+        final LocalDate originalStart = originalDate.getStartDate();
+        final LocalDate originalEnd = originalDate.getEndDate();
+        final int yearOfEra = getYearOfEra(originalStart);
+
+        switch (range.getType()) {
+            case FROM:
+                return new DateBounds(originalStart, originalEnd.plusYears(getDateDelta(yearOfEra)));
+            case UNTIL:
+                return new DateBounds(originalStart.minusYears(getDateDelta(yearOfEra)), originalEnd);
+            case BEFORE:
+                return new DateBounds(originalStart.minusYears(getDateDelta(yearOfEra)), originalStart.minusDays(1));
+            case AROUND:
+                final int aroundDelta = getAroundDelta(yearOfEra);
+                return new DateBounds(originalStart.minusYears(aroundDelta), originalEnd.plusYears(aroundDelta));
+            case AFTER:
+                return new DateBounds(originalStart, originalEnd.plusYears(25));
+            case PRESUMABLY:
+                return new DateBounds(originalStart, originalEnd);
+            default:
+                return new DateBounds(null, null);
+        }
     }
 
-    private Operator parseOperator(InputStringReader input, Position startingPosition) {
-        Position p;
-        AcceptResult a;
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, ',');
-        if (a.isAccepted()) {
-            startingPosition.update(p);
-            return new Operator(a.getParsedInputString(), Operator.OperatorType.OR);
+    /**
+     * Resolves a limitation like "Mitte" or "2. Viertel" against a century.
+     */
+    private DateBounds getStartAndEnd(final CenturyMillenniumLimitation limitation, final int century) {
+        switch (limitation.getLimitation()) {
+            case DECADE:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 10, 1, 1),
+                        LocalDate.of((century - 1) * 100 + limitation.getNumber() * 10, 12, 31));
+            case QUARTER:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 25, 1, 1),
+                        LocalDate.of((century - 1) * 100 + limitation.getNumber() * 25, 12, 31));
+            case THIRD:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 33, 1, 1),
+                        LocalDate.of((century - 1) * 100 + limitation.getNumber() * 33, 12, 31));
+            case HALF:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 50, 1, 1),
+                        LocalDate.of((century - 1) * 100 + limitation.getNumber() * 50, 12, 31));
+            case START:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 1, 1, 1),
+                        LocalDate.of((century - 1) * 100 + 15, 12, 31));
+            case MIDDLE:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 45, 1, 1),
+                        LocalDate.of((century - 1) * 100 + 55, 12, 31));
+            case END:
+                return new DateBounds(
+                        LocalDate.of((century - 1) * 100 + 85, 1, 1),
+                        LocalDate.of((century - 1) * 100 + 100, 12, 31));
+            default:
+                return new DateBounds(null, null);
         }
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, '/');
-        if (a.isAccepted()) {
-            startingPosition.update(p);
-            return new Operator(a.getParsedInputString(), Operator.OperatorType.BETWEEN);
-        }
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, " oder ");
-        if (a.isAccepted()) {
-            startingPosition.update(p);
-            return new Operator(a.getParsedInputString(), Operator.OperatorType.OR);
-        }
-
-        return null;
     }
 
-    private TimeSpan parseSimple(InputStringReader input, Position startingPosition) {
-        Position p = startingPosition.copy();
-        Range range = parseRange(input, p);
-        if (range != null) {
-            AcceptResult a = input.tryToAccept(p, ' ');
-            if (a.isAccepted()) {
-                TimeSpan originalDate = parseDate(input, p);
-                if (originalDate != null) {
-                    List<LocalDate> modifiedStartEnd = getModifiedStartEnd(originalDate, range);
-                    startingPosition.update(p);
-                    return new TimeSpan(range.getParsedInputString()
-                            + a.getParsedInputString()
-                            + originalDate.getParsedInputString(), modifiedStartEnd.get(0), modifiedStartEnd.get(1));
-                }
-            }
+    /**
+     * Parses qualifiers such as "Anfang", "2. Viertel" or "1. Dekade".
+     */
+    private CenturyMillenniumLimitation parseCenturyMillenniumLimitation(
+            final InputStringReader input,
+            final Position startingPosition) {
+        final Position cursor = startingPosition.copy();
+        final AcceptResult acceptResult = input.tryToAccept(cursor, PATTERN_CENTURY_MILLENNIUM_LIMITATION);
+        if (!acceptResult.isAccepted()) {
+            return null;
         }
 
-        return parseDate(input, startingPosition);
+        Integer number = null;
+        CenturyMillenniumLimitation.LimitationType limitationType = null;
+        if ("Dekade".equals(acceptResult.group(2))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.DECADE;
+            number = Integer.valueOf(acceptResult.group(1));
+        } else if ("Viertel".equals(acceptResult.group(6))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.QUARTER;
+            number = Integer.valueOf(acceptResult.group(5));
+        } else if ("Drittel".equals(acceptResult.group(4))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.THIRD;
+            number = Integer.valueOf(acceptResult.group(3));
+        } else if ("Hälfte".equals(acceptResult.group(8))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.HALF;
+            number = Integer.valueOf(acceptResult.group(7));
+        } else if ("Anfang".equals(acceptResult.group(0))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.START;
+        } else if ("Mitte".equals(acceptResult.group(0))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.MIDDLE;
+        } else if ("Ende".equals(acceptResult.group(0))) {
+            limitationType = CenturyMillenniumLimitation.LimitationType.END;
+        }
+
+        startingPosition.update(cursor);
+        return new CenturyMillenniumLimitation(acceptResult.getParsedInputString(), number, limitationType);
     }
 
-    private List<LocalDate> getModifiedStartEnd(TimeSpan originalDate, Range range) {
-        LocalDate originalStart = originalDate.getStartDate();
-        LocalDate originalEnd = originalDate.getEndDate();
-        LocalDate modifiedStart = null;
-        LocalDate modifiedEnd = null;
-
-        if (range.getType() == Range.RangeType.FROM) { // ab, seit
-            int date = getYearOfEra(originalStart);
-            int delta = getDateDelta(date);
-
-            modifiedStart = originalStart;
-            modifiedEnd = originalEnd.plusYears(delta);
-
-        } else if (range.getType() == Range.RangeType.UNTIL) { // bis
-            int date = getYearOfEra(originalStart);
-            int delta = getDateDelta(date);
-
-            modifiedStart = originalStart.minusYears(delta);
-            modifiedEnd = originalEnd;
-
-        } else if (range.getType() == Range.RangeType.BEFORE) { // vor
-            int date = getYearOfEra(originalStart);
-            int delta = getDateDelta(date);
-
-            modifiedStart = originalStart.minusYears(delta);
-            modifiedEnd = originalStart.minusDays(1);
-
-        } else if (range.getType() == Range.RangeType.AROUND) {
-            int delta = 0;
-            if (getYearOfEra(originalStart) >= 1900) {
-                delta = 1;
-            } else if (getYearOfEra(originalStart) >= 1700) {
-                delta = 2;
-            } else if (getYearOfEra(originalStart) >= 1000) {
-                delta = 5;
-            } else {
-                delta = 10;
-            }
-
-            modifiedStart = originalStart.minusYears(delta);
-            modifiedEnd = originalEnd.plusYears(delta);
-        } else if (range.getType() == Range.RangeType.AFTER) {
-            modifiedStart = originalStart;
-            modifiedEnd = originalEnd.plusYears(25);
-        } else if (range.getType() == Range.RangeType.PRESUMABLY) {
-            modifiedStart = originalStart;
-            modifiedEnd = originalEnd;
+    private int getAroundDelta(final int yearOfEra) {
+        if (yearOfEra >= 1900) {
+            return 1;
         }
-        return Arrays.asList(modifiedStart, modifiedEnd);
+        if (yearOfEra >= 1700) {
+            return 2;
+        }
+        if (yearOfEra >= 1000) {
+            return 5;
+        }
+        return 10;
     }
 
-    private Range parseRange(InputStringReader input, Position startingPosition) {
-        Position p = startingPosition.copy();
-        AcceptResult a = input.tryToAccept(p, PATTERN_RANGE);
-        if (a.isAccepted()) {
-            startingPosition.update(p);
-            if (null != a.group(1))
-                switch (a.group(1)) {
-                    case "ab":
-                        return new Range(a.getParsedInputString(), Range.RangeType.FROM);
-                    case "seit":
-                        return new Range(a.getParsedInputString(), Range.RangeType.FROM);
-                    case "bis":
-                        return new Range(a.getParsedInputString(), Range.RangeType.UNTIL);
-                    case "vor":
-                        return new Range(a.getParsedInputString(), Range.RangeType.BEFORE);
-                    case "um":
-                        return new Range(a.getParsedInputString(), Range.RangeType.AROUND);
-                    case "ca.":
-                        return new Range(a.getParsedInputString(), Range.RangeType.AROUND);
-                    case "nach":
-                        return new Range(a.getParsedInputString(), Range.RangeType.AFTER);
-                    case "vermutlich":
-                        return new Range(a.getParsedInputString(), Range.RangeType.PRESUMABLY);
-                    default:
-                        break;
-                }
+    private int getDateDelta(final int yearOfEra) {
+        if (yearOfEra >= 0 && yearOfEra <= 999) {
+            return 100;
         }
-        return null;
+        if (yearOfEra >= 1000 && yearOfEra <= 1499) {
+            return 50;
+        }
+        if (yearOfEra >= 1500 && yearOfEra <= 1799) {
+            return 25;
+        }
+        if (yearOfEra >= 1800 && yearOfEra <= 1899) {
+            return 10;
+        }
+        if (yearOfEra >= 1900 && yearOfEra <= 1945) {
+            return 3;
+        }
+        if (yearOfEra >= 1946) {
+            return 1;
+        }
+        return 0;
     }
 
-    private TimeSpan parseDate(InputStringReader input, Position startingPosition) {
-        TimeSpan timeSpan = null;
-
-        timeSpan = parseCenturyOrMillennium(input, startingPosition);
-        if (timeSpan == null) {
-            timeSpan = parseYMD(input, startingPosition);
-        }
-
-        return timeSpan;
-
-    }
-
-    private TimeSpan parseCenturyOrMillennium(InputStringReader input, Position startingPosition) {
-        LocalDate start;
-        LocalDate end;
-
-        Position p;
-        AcceptResult a;
-
-        p = startingPosition.copy();
-        CenturyMillenniumLimitation limitation = parseCenturyMillenniumLimitation(input, p);
-        if (limitation != null) {
-            a = input.tryToAccept(p, ' ');
-            if (a.isAccepted()) {
-                AcceptResult a2 = input.tryToAccept(p, PATTERN_CENTURY);
-                if (a2.isAccepted()) {
-                    List<LocalDate> startEnd = getStartAndEnd(limitation, Integer.parseInt(a2.group(1)));
-                    start = startEnd.get(0);
-                    end = startEnd.get(1);
-
-                    startingPosition.update(p);
-                    return new TimeSpan(limitation.getParsedInputString()
-                            + a.getParsedInputString()
-                            + a2.getParsedInputString(), start, end);
-                }
-            }
-        }
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, PATTERN_CENTURY);
-        if (a.isAccepted()) {
-            int century = Integer.parseInt(a.group(1));
-
-            start = LocalDate.of((century - 1) * 100 + 1, 1, 1);
-            end = LocalDate.of(century * 100, 12, 31);
-
-            startingPosition.update(p);
-            return new TimeSpan(a.getParsedInputString(), start, end);
-        }
-        return null;
-    }
-
-    private List<LocalDate> getStartAndEnd(CenturyMillenniumLimitation limitation, int century) {
-        LocalDate start = null;
-        LocalDate end = null;
-        if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.DECADE) {
-            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 10, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 10, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.QUARTER) {
-            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 25, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 25, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.THIRD) {
-            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 33, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 33, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.HALF) {
-            start = LocalDate.of((century - 1) * 100 + 1 + (limitation.getNumber() - 1) * 50, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + limitation.getNumber() * 50, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.START) {
-            start = LocalDate.of((century - 1) * 100 + 1, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + 15, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.MIDDLE) {
-            start = LocalDate.of((century - 1) * 100 + 45, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + 55, 12, 31);
-        } else if (limitation.getLimitation() == CenturyMillenniumLimitation.LimitationType.END) {
-            start = LocalDate.of((century - 1) * 100 + 85, 1, 1);
-            end = LocalDate.of((century - 1) * 100 + 100, 12, 31);
-        } else {
-            start = null;
-            end = null;
-        }
-        return Arrays.asList(start, end);
-    }
-
-    private TimeSpan parseYMD(InputStringReader input, Position startingPosition) {
-        LocalDate start;
-        LocalDate end;
-
-        Position p;
-        AcceptResult a;
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, PATTERN_YMD);
-        if (a.isAccepted()) {
-            boolean isAD = a.group(1) == null || "".equals(a.group(1));
-
-            start = createGregorianCalendar(
-                    isAD,
-                    Integer.parseInt(a.group(2)),
-                    Integer.parseInt(a.group(3)) - 1,
-                    Integer.parseInt(a.group(4)));
-            end = start;
-
-            startingPosition.update(p);
-            return new TimeSpan(a.getParsedInputString(), start, end);
-        }
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, PATTERN_YM);
-        if (a.isAccepted()) {
-            boolean isAD = a.group(1) == null || "".equals(a.group(1));
-            int year = Integer.parseInt(a.group(2));
-            int month = Integer.parseInt(a.group(3));
-
-            start = createGregorianCalendar(isAD, year, month - 1, 1);
-            end = LocalDate.of(start.getYear(), start.getMonthValue(),
-                    YearMonth.of(start.getYear(), start.getMonthValue()).lengthOfMonth());
-
-            startingPosition.update(p);
-            return new TimeSpan(a.getParsedInputString(), start, end);
-        }
-
-        p = startingPosition.copy();
-        a = input.tryToAccept(p, PATTERN_Y);
-        if (a.isAccepted()) {
-            boolean isAD = a.group(1) == null || "".equals(a.group(1));
-            int year = Integer.parseInt(a.group(2));
-            start = createGregorianCalendar(isAD, year, 0, 1);
-            end = createGregorianCalendar(isAD, year, 11, 31);
-
-            startingPosition.update(p);
-            return new TimeSpan(a.group(0), start, end);
-        }
-
-        return null;
-    }
-
-    private int getDateDelta(int date) {
-        int delta = 0;
-        if (date >= 0 && date <= 999) {
-            delta = 100;
-        } else if (date >= 1000 && date <= 1499) {
-            delta = 50;
-        } else if (date >= 1500 && date <= 1799) {
-            delta = 25;
-        } else if (date >= 1800 && date <= 1899) {
-            delta = 10;
-        } else if (date >= 1900 && date <= 1945) {
-            delta = 3;
-        } else if (date >= 1946) {
-            delta = 1;
-        }
-        return delta;
-    }
-
-    private int getYearOfEra(LocalDate date) {
+    private int getYearOfEra(final LocalDate date) {
         return date.getYear() > 0 ? date.getYear() : (1 - date.getYear());
     }
 
-    private CenturyMillenniumLimitation parseCenturyMillenniumLimitation(
-            InputStringReader input,
-            Position startingPosition) {
-        Position p = startingPosition.copy();
-        AcceptResult a = input.tryToAccept(p, PATTERN_CENTURY_MILLENNIUM_LIMITATION);
-        if (a.isAccepted()) {
-            Integer number = null;
-            CenturyMillenniumLimitation.LimitationType limitationType = null;
-            if ("Dekade".equals(a.group(2))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.DECADE;
-                number = Integer.valueOf(a.group(1));
-            } else if ("Viertel".equals(a.group(6))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.QUARTER;
-                number = Integer.valueOf(a.group(5));
-            } else if ("Drittel".equals(a.group(4))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.THIRD;
-                number = Integer.valueOf(a.group(3));
-            } else if ("Hälfte".equals(a.group(8))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.HALF;
-                number = Integer.valueOf(a.group(7));
-            } else if ("Anfang".equals(a.group(0))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.START;
-            } else if ("Mitte".equals(a.group(0))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.MIDDLE;
-            } else if ("Ende".equals(a.group(0))) {
-                limitationType = CenturyMillenniumLimitation.LimitationType.END;
-            }
-
-            startingPosition.update(p);
-            return new CenturyMillenniumLimitation(a.getParsedInputString(), number, limitationType);
-        }
-        return null;
+    private LocalDate copyDateWithEra(final LocalDate source, final boolean isAnnoDomini) {
+        final int yearOfEra = getYearOfEra(source);
+        final int prolepticYear = isAnnoDomini ? yearOfEra : (1 - yearOfEra);
+        return LocalDate.of(prolepticYear, source.getMonthValue(), source.getDayOfMonth());
     }
 
-    private LocalDate createGregorianCalendar(boolean isAnnoDomini, int year, int month, int day) {
-        int prolepticYear = isAnnoDomini ? year : (1 - year);
+    private LocalDate createGregorianCalendar(final boolean isAnnoDomini, final int year, final int month,
+            final int day) {
+        final int prolepticYear = isAnnoDomini ? year : (1 - year);
         return LocalDate.of(prolepticYear, month + 1, day);
     }
 }

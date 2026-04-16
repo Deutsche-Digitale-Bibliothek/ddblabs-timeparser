@@ -17,21 +17,28 @@ package de.ddb.labs.timeparser.timespan;
 
 import lombok.Getter;
 
+/**
+ * Qualifier narrowing a century expression to a subrange such as a half or
+ * quarter.
+ */
 @Getter
-public class CenturyMillenniumLimitation {
+final class CenturyMillenniumLimitation {
 
     private final String parsedInputString;
     private final Integer number;
     private final LimitationType limitation;
 
-    public enum LimitationType {
+    /**
+     * Supported subrange categories for century expressions.
+     */
+    enum LimitationType {
         QUARTER, THIRD, HALF, DECADE, START, MIDDLE, END
     }
 
-    public CenturyMillenniumLimitation(String parsedInputString, Integer number, LimitationType limitation) {
+    CenturyMillenniumLimitation(final String parsedInputString, final Integer number,
+            final LimitationType limitation) {
         this.parsedInputString = parsedInputString;
         this.number = number;
         this.limitation = limitation;
     }
-
 }

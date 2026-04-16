@@ -29,40 +29,58 @@ public class Outputter {
 
     private final List<Token> outputPatternTokens;
 
-    public Outputter(List<Token> outputPatternTokens) {
-        this.outputPatternTokens = outputPatternTokens;
+    /**
+     * @param outputPatternTokens parsed output specification tokens
+     */
+    public Outputter(final List<Token> outputPatternTokens) {
+        this.outputPatternTokens = List.copyOf(outputPatternTokens);
     }
 
-    public String createOutputString(List<TokenWithValue> tokensWithValues) throws IllegalStateException {
-        Map<Character, TokenWithValue> tokensWithValuesByVariableName = new HashMap<>();
-        for (TokenWithValue tokenWithValue : tokensWithValues) {
-            if (tokenWithValue.getType() != Token.Type.TEXT) {
-                tokensWithValuesByVariableName.put(tokenWithValue.getPatternValue().charAt(0), tokenWithValue);
-            }
-        }
-
-        StringBuilder output = new StringBuilder();
-        for (Token outputPatternToken : this.outputPatternTokens) {
+    /**
+     * Creates the normalized output string for the supplied input token values.
+     *
+     * @param tokensWithValues parsed input tokens including their concrete values
+     * @return normalized output string
+     * @throws IllegalStateException if a required variable is missing or too short
+     */
+    public String createOutputString(final List<TokenWithValue> tokensWithValues) throws IllegalStateException {
+        final Map<Character, TokenWithValue> tokensWithValuesByVariableName = indexTokensByVariableName(tokensWithValues);
+        final StringBuilder output = new StringBuilder();
+        for (final Token outputPatternToken : this.outputPatternTokens) {
             if (outputPatternToken.getType() == Token.Type.TEXT) {
                 output.append(outputPatternToken.getPatternValue());
             } else {
-                char variableName = outputPatternToken.getPatternValue().charAt(0);
+                final char variableName = outputPatternToken.getPatternValue().charAt(0);
+                final TokenWithValue tokenWithValue = tokensWithValuesByVariableName.get(variableName);
 
-                if (tokensWithValuesByVariableName.get(variableName) == null) {
-                    throw new IllegalStateException("No input token found for variable name " + variableName);
-                }
+                ensureVariableCanBeRendered(outputPatternToken, tokenWithValue, variableName);
 
-                if (outputPatternToken.getPatternValue().length() > tokensWithValuesByVariableName.get(variableName)
-                        .getPatternValue().length()) {
-                    throw new IllegalStateException(
-                            "Output length of variable " + variableName + " greater than input length");
-                }
-
-                output.append(tokensWithValuesByVariableName.get(variableName).getInputValue().substring(0,
+                output.append(tokenWithValue.getInputValue().substring(0,
                         outputPatternToken.getPatternValue().length()));
             }
         }
         return output.toString();
     }
 
+    private Map<Character, TokenWithValue> indexTokensByVariableName(final List<TokenWithValue> tokensWithValues) {
+        final Map<Character, TokenWithValue> tokensWithValuesByVariableName = new HashMap<>();
+        for (final TokenWithValue tokenWithValue : tokensWithValues) {
+            if (tokenWithValue.getType() != Token.Type.TEXT) {
+                tokensWithValuesByVariableName.put(tokenWithValue.getPatternValue().charAt(0), tokenWithValue);
+            }
+        }
+        return tokensWithValuesByVariableName;
+    }
+
+    private void ensureVariableCanBeRendered(final Token outputPatternToken, final TokenWithValue tokenWithValue,
+            final char variableName) {
+        if (tokenWithValue == null) {
+            throw new IllegalStateException("No input token found for variable name " + variableName);
+        }
+
+        if (outputPatternToken.getPatternValue().length() > tokenWithValue.getPatternValue().length()) {
+            throw new IllegalStateException(
+                    "Output length of variable " + variableName + " greater than input length");
+        }
+    }
 }

@@ -13,18 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.ddb.labs.timeparser.data;
+package de.ddb.labs.timeparser.http;
+
+import de.ddb.labs.timeparser.timespan.TimeSpan;
+import java.time.LocalDate;
 
 /**
- * Contains a string that needs to be replaced and a string by which it should
- * be replaced. Used to convert textual months and weekdays to numbers.
+ * JSON-facing time span with explicit ISO date field names.
  */
-public class Replacement {
-    public final String from;
-    public final String to;
+public record HttpTimeSpan(
+        String parsedInputString,
+        LocalDate startISODate,
+        LocalDate endISODate) {
 
-    public Replacement(String from, String to) {
-        this.from = from;
-        this.to = to;
+    public static HttpTimeSpan from(final TimeSpan timeSpan) {
+        if (timeSpan == null) {
+            return null;
+        }
+        return new HttpTimeSpan(
+                timeSpan.getParsedInputString(),
+                timeSpan.getStartDate(),
+                timeSpan.getEndDate());
     }
 }

@@ -19,10 +19,14 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/**
+ * Facet metadata used to map parsed year ranges to index facets.
+ */
 @Getter
 @EqualsAndHashCode
 @ToString
 public class Facet {
+
     private final String id;
     private final String notation;
     private final Long earliestDate;
@@ -31,8 +35,8 @@ public class Facet {
     private final String prefLabelEn;
     private final String sortOrder;
 
-    public Facet(String id, String notation, Long earliestDate, Long latestDate, String prefLabelDe, String prefLabelEn,
-            String sortOrder) {
+    public Facet(final String id, final String notation, final Long earliestDate, final Long latestDate,
+            final String prefLabelDe, final String prefLabelEn, final String sortOrder) {
         this.id = id;
         this.notation = notation;
         this.earliestDate = earliestDate;
@@ -41,5 +45,4 @@ public class Facet {
         this.prefLabelEn = prefLabelEn;
         this.sortOrder = sortOrder;
     }
-
 }

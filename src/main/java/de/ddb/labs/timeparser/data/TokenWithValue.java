@@ -15,11 +15,13 @@
  */
 package de.ddb.labs.timeparser.data;
 
-/** An element in a rule's input specification, filled with a value from the input string. Created by {@link InputParser}. */
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
+/**
+ * Input token enriched with the concrete substring matched from the source input.
+ */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString(callSuper = true)
@@ -27,11 +29,14 @@ public class TokenWithValue extends Token {
 
     private final String inputValue;
 
-    public TokenWithValue(Type type, String patternValue, String inputValue) {
+    public TokenWithValue(final Type type, final String patternValue, final String inputValue) {
         super(type, patternValue);
         this.inputValue = inputValue;
     }
 
+    /**
+     * Default constructor kept for serializer compatibility.
+     */
     public TokenWithValue() {
         super(null, null);
         this.inputValue = null;

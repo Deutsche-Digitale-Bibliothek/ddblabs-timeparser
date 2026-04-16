@@ -24,11 +24,12 @@ import lombok.Getter;
  */
 @Getter
 public class TimeSpan {
+
     private final String parsedInputString;
     private final LocalDate startDate;
     private final LocalDate endDate;
 
-    public TimeSpan(String parsedInputString, LocalDate startDate, LocalDate endDate) {
+    public TimeSpan(final String parsedInputString, final LocalDate startDate, final LocalDate endDate) {
         this.parsedInputString = parsedInputString;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -36,8 +37,8 @@ public class TimeSpan {
 
     @Override
     public String toString() {
-        String startEra = this.startDate.getYear() <= 0 ? "BC" : "AD";
-        String endEra = this.endDate.getYear() <= 0 ? "BC" : "AD";
+        final String startEra = this.startDate.getYear() <= 0 ? "BC" : "AD";
+        final String endEra = this.endDate.getYear() <= 0 ? "BC" : "AD";
         return "TimeSpan[" + this.startDate + " (" + startEra + ") - " + this.endDate + " (" + endEra + "), \""
                 + this.parsedInputString + "\"]";
     }

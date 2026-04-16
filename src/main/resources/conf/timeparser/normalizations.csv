@@ -1,0 +1,50 @@
+from,to,type,comment
+(?i)\bv\.?\s*Chr\.?(?=\s|$),v. Chr.,normalization,normalize BCE abbreviation variants
+(?i)\bn\.?\s*Chr\.?(?=\s|$),n. Chr.,normalization,normalize CE abbreviation variants
+(?i)\bMio\.?(?=\s|$),Mio.,normalization,normalize million abbreviation variants
+(?i)\bMillion(?:en)?(?=\s|$),Mio.,normalization,normalize million word variants
+(?i)\bMrd\.?(?=\s|$),Mrd.,normalization,normalize milliard abbreviation variants
+(?i)\bMilliard(?:e|en)(?=\s|$),Mrd.,normalization,normalize milliard word variants
+(?i)\bBill\.?(?=\s|$),Billionen,normalization,normalize billion abbreviation variants
+(?i)\bBillion(?:en)?(?=\s|$),Billionen,normalization,normalize billion word variants
+Januar,01,month,full month name
+Februar,02,month,full month name
+März,03,month,full month name
+April,04,month,full month name
+Mai,05,month,full month name
+Juni,06,month,full month name
+Juli,07,month,full month name
+August,08,month,full month name
+September,09,month,full month name
+Oktober,10,month,full month name
+November,11,month,full month name
+Dezember,12,month,full month name
+Jan.,01,month,abbreviation with dot
+Feb.,02,month,abbreviation with dot
+Mrz.,03,month,abbreviation with dot
+Apr.,04,month,abbreviation with dot
+Jun.,06,month,abbreviation with dot
+Jul.,07,month,abbreviation with dot
+Aug.,08,month,abbreviation with dot
+Sept.,09,month,abbreviation with dot
+Okt.,10,month,abbreviation with dot
+Nov.,11,month,abbreviation with dot
+Dez.,12,month,abbreviation with dot
+Jan,01,month,abbreviation without dot
+Feb,02,month,abbreviation without dot
+Mrz,03,month,abbreviation without dot
+Apr,04,month,abbreviation without dot
+Jun,06,month,abbreviation without dot
+Jul,07,month,abbreviation without dot
+Aug,08,month,abbreviation without dot
+Sept,09,month,abbreviation without dot
+Okt,10,month,abbreviation without dot
+Nov,11,month,abbreviation without dot
+Dez,12,month,abbreviation without dot
+Montag,GG,weekday,weekday token
+Dienstag,GG,weekday,weekday token
+Mittwoch,GG,weekday,weekday token
+Donnerstag,GG,weekday,weekday token
+Freitag,GG,weekday,weekday token
+Samstag,GG,weekday,weekday token
+Sonntag,GG,weekday,weekday token

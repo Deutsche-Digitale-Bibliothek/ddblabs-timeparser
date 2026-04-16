@@ -17,19 +17,24 @@ package de.ddb.labs.timeparser.timespan;
 
 import lombok.Getter;
 
+/**
+ * Binary operator between two parsed time expressions.
+ */
 @Getter
-public class Operator {
+final class Operator {
 
     private final String parsedInputString;
     private final OperatorType type;
 
-    public enum OperatorType {
+    /**
+     * Supported operator categories in normalized expressions.
+     */
+    enum OperatorType {
         OR, BETWEEN
     }
 
-    public Operator(String parsedInputString, OperatorType type) {
+    Operator(final String parsedInputString, final OperatorType type) {
         this.parsedInputString = parsedInputString;
         this.type = type;
     }
-
 }

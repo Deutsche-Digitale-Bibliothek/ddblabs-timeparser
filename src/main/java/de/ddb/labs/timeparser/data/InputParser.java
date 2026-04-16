@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import de.ddb.labs.timeparser.replacement.Replacement;
+
 /**
  * Parses an input string using a list of {@link Token}s, created from a rule's
  * input specification by
@@ -30,66 +32,43 @@ public class InputParser {
     private static final Pattern PATTERN_DIGITS = Pattern.compile("\\d+");
     private static final String LOGEXPR_WITH = "\" with ";
 
-    private final List<Token> patternTokens = new ArrayList<>();
+    private final List<Token> patternTokens;
     private final List<Replacement> monthReplacements;
     private final List<Replacement> weekdayReplacements;
 
     public InputParser(
-            List<Token> pattern,
-            List<Replacement> monthReplacements,
-            List<Replacement> weekdayReplacements) {
-        this.patternTokens.addAll(pattern);
-        this.monthReplacements = monthReplacements;
-        this.weekdayReplacements = weekdayReplacements;
+            final List<Token> pattern,
+            final List<Replacement> monthReplacements,
+            final List<Replacement> weekdayReplacements) {
+        this.patternTokens = List.copyOf(pattern);
+        this.monthReplacements = List.copyOf(monthReplacements);
+        this.weekdayReplacements = List.copyOf(weekdayReplacements);
     }
 
+    /**
+     * Applies the configured token pattern to a normalized input string.
+     *
+     * @param inputString normalized input string
+     * @return tokens enriched with the concrete input values
+     * @throws IllegalStateException if the input does not match the configured pattern
+     */
     public List<TokenWithValue> parseInputString(String inputString) throws IllegalStateException {
-        List<TokenWithValue> tokens = new ArrayList<>();
+        final List<TokenWithValue> tokens = new ArrayList<>();
 
-        for (Replacement replacement : this.monthReplacements) {
-            inputString = inputString.replace(replacement.from, replacement.to);
-        }
-
-        for (Replacement replacement : this.weekdayReplacements) {
-            inputString = inputString.replace(replacement.from, replacement.to);
-        }
+        inputString = Replacement.applyAll(inputString, this.monthReplacements);
+        inputString = Replacement.applyAll(inputString, this.weekdayReplacements);
 
         int currentInputStringPosition = 0;
-        for (Token patternToken : this.patternTokens) {
-            int patternValueLength = patternToken.getPatternValue().length();
-            if (currentInputStringPosition + patternValueLength > inputString.length()) {
-                throw new IllegalStateException("Input string too short; cannot parse \""
-                        + inputString
-                        + LOGEXPR_WITH
-                        + this.patternTokens.toString());
-            }
-            String tokenInputValue = inputString.substring(currentInputStringPosition, currentInputStringPosition
-                    + patternValueLength);
+        for (final Token patternToken : this.patternTokens) {
+            final int patternValueLength = patternToken.getPatternValue().length();
+            ensureInputHasRemainingCharacters(inputString, currentInputStringPosition, patternValueLength);
 
-            if (patternToken.getType() == Token.Type.TEXT
-                    && !patternToken.getPatternValue().equals(tokenInputValue)) {
-                throw new IllegalStateException(
-                        "Input string's text does not match pattern's text at position "
-                                + currentInputStringPosition
-                                + "; cannot parse \""
-                                + inputString
-                                + LOGEXPR_WITH
-                                + this.patternTokens.toString());
-            } else if (patternToken.getType() == Token.Type.GENERIC_VARIABLE) {
-                Matcher matcher = PATTERN_DIGITS.matcher(tokenInputValue);
-                if (!matcher.lookingAt()) {
-                    throw new IllegalStateException("Number expected in input string at position "
-                            + currentInputStringPosition
-                            + "; cannot parse \""
-                            + inputString
-                            + LOGEXPR_WITH
-                            + this.patternTokens.toString());
-                }
-            }
+            final String tokenInputValue = inputString.substring(currentInputStringPosition,
+                    currentInputStringPosition + patternValueLength);
 
-            TokenWithValue token = new TokenWithValue(patternToken.getType(), patternToken.getPatternValue(),
-                    tokenInputValue);
-            tokens.add(token);
+            validateTokenInput(patternToken, inputString, currentInputStringPosition, tokenInputValue);
+
+            tokens.add(new TokenWithValue(patternToken.getType(), patternToken.getPatternValue(), tokenInputValue));
             currentInputStringPosition += patternValueLength;
         }
         if (currentInputStringPosition < inputString.length()) {
@@ -100,5 +79,41 @@ public class InputParser {
         }
 
         return tokens;
+    }
+
+    private void ensureInputHasRemainingCharacters(final String inputString, final int currentInputStringPosition,
+            final int patternValueLength) {
+        if (currentInputStringPosition + patternValueLength > inputString.length()) {
+            throw new IllegalStateException("Input string too short; cannot parse \""
+                    + inputString
+                    + LOGEXPR_WITH
+                    + this.patternTokens.toString());
+        }
+    }
+
+    private void validateTokenInput(final Token patternToken, final String inputString,
+            final int currentInputStringPosition, final String tokenInputValue) {
+        if (patternToken.getType() == Token.Type.TEXT
+                && !patternToken.getPatternValue().equals(tokenInputValue)) {
+            throw new IllegalStateException(
+                    "Input string's text does not match pattern's text at position "
+                            + currentInputStringPosition
+                            + "; cannot parse \""
+                            + inputString
+                            + LOGEXPR_WITH
+                            + this.patternTokens.toString());
+        }
+
+        if (patternToken.getType() == Token.Type.GENERIC_VARIABLE) {
+            final Matcher matcher = PATTERN_DIGITS.matcher(tokenInputValue);
+            if (!matcher.lookingAt()) {
+                throw new IllegalStateException("Number expected in input string at position "
+                        + currentInputStringPosition
+                        + "; cannot parse \""
+                        + inputString
+                        + LOGEXPR_WITH
+                        + this.patternTokens.toString());
+            }
+        }
     }
 }

@@ -15,29 +15,30 @@
  */
 package de.ddb.labs.timeparser.timespan;
 
+import lombok.Getter;
+
 /**
- * A pos within an input string that is being parsed by {@link TimeSpanParser}.
+ * Mutable cursor within the normalized input string processed by
+ * {@link TimeSpanParser}.
  * {@link InputStringReader} will update a {@link Position} once a requested
  * string can be accepted.
  */
-class Position {
+@Getter
+final class Position {
+
     private int pos = 0;
 
-    public int get() {
-        return this.pos;
-    }
-
-    public void move(int move) {
+    void move(final int move) {
         this.pos += move;
     }
 
-    public void update(Position position) {
+    void update(final Position position) {
         this.pos = position.pos;
     }
 
-    public Position copy() {
-        Position p = new Position();
-        p.pos = this.pos;
-        return p;
+    Position copy() {
+        final Position copy = new Position();
+        copy.pos = this.pos;
+        return copy;
     }
 }

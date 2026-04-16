@@ -299,21 +299,36 @@ um ####/####,um JJJJ/ZZZZ,um 1645/1646,um ####/um ####,um JJJJ/um ZZZZ,um 1645/u
 ####-####,JJJJ-ZZZZ,1973-2009,####/####,JJJJ/ZZZZ,1973/2009,1973/2009
 #.#### - ##.#### = Nr. #-###,P.JJJJ - NN.ZZZZ = Nr. Q-WWW,1.1912 - 46.1936 = Nr. 1-411,####/####,JJJJ/ZZZZ,1912/1936,1912/1936
 Nachgewiesen #### - ####,Nachgewiesen JJJJ - ZZZZ,Nachgewiesen 1999 - 2007,####/####,JJJJ/ZZZZ,1999/2007,1999/2007
-# v.Chr.,J v.Chr.,2 v.Chr.,-#,-J,-2,2 v.Chr.
 # v. Chr.,J v. Chr.,2 v. Chr.,-#,-J,-2,2 v. Chr.
-## v.Chr.,JJ v.Chr.,20 v.Chr.,-##,-JJ,-20,20 v.Chr.
 ## v. Chr.,JJ v. Chr.,20 v. Chr.,-##,-JJ,-20,20 v. Chr.
-### v.Chr.,JJJ v.Chr.,200 v.Chr.,-###,-JJJ,-200,200 v.Chr.
 ### v. Chr.,JJJ v. Chr.,200 v. Chr.,-###,-JJJ,-200,200 v. Chr.
-#### v.Chr.,JJJJ v.Chr.,2000 v.Chr.,-####,-JJJJ,-2000,2000 v.Chr.
 #### v. Chr.,JJJJ v. Chr.,2000 v. Chr.,-####,-JJJJ,-2000,2000 v. Chr.
-##### v.Chr.,JJJJJ v.Chr.,20000 v.Chr.,-#####,-JJJJJ,-20000,20000 v.Chr.
 ##### v. Chr.,JJJJJ v. Chr.,20000 v. Chr.,-#####,-JJJJJ,-20000,20000 v. Chr.
-###### v.Chr.,JJJJJJ v.Chr.,200000 v.Chr.,-######,-JJJJJJ,-200000,200000 v.Chr.
 ###### v. Chr.,JJJJJJ v. Chr.,200000 v. Chr.,-######,-JJJJJJ,-200000,200000 v. Chr.
-####### v.Chr.,JJJJJJJ v.Chr.,2000000 v.Chr.,-#######,-JJJJJJJ,-2000000,2000000 v.Chr.
 ####### v. Chr.,JJJJJJJ v. Chr.,2000000 v. Chr.,-#######,-JJJJJJJ,-2000000,2000000 v. Chr.
-######## v.Chr.,JJJJJJJJ v.Chr.,20000000 v.Chr.,-########,-JJJJJJJJ,-20000000,20000000 v.Chr.
 ######## v. Chr.,JJJJJJJJ v. Chr.,20000000 v. Chr.,-########,-JJJJJJJJ,-20000000,20000000 v. Chr.
-######### v.Chr.,JJJJJJJJJ v.Chr.,200000000 v.Chr.,-#########,-JJJJJJJJJ,-200000000,200000000 v.Chr.
 ######### v. Chr.,JJJJJJJJJ v. Chr.,200000000 v. Chr.,-#########,-JJJJJJJJJ,-200000000,200000000 v. Chr.
+vor # Mio. Jahren,vor J Mio. Jahren,vor 5 Mio. Jahren,-#000000,-J000000,-5000000,vor 5 Mio. Jahren
+vor ## Mio. Jahren,vor JJ Mio. Jahren,vor 50 Mio. Jahren,-##000000,-JJ000000,-50000000,vor 50 Mio. Jahren
+vor ### Mio. Jahren,vor JJJ Mio. Jahren,vor 500 Mio. Jahren,-###000000,-JJJ000000,-500000000,vor 500 Mio. Jahren
+vor #### Mio. Jahren,vor JJJJ Mio. Jahren,vor 1000 Mio. Jahren,-####000000,-JJJJ000000,-1000000000,vor 1000 Mio. Jahren
+in # Mio. Jahren,in J Mio. Jahren,in 5 Mio. Jahren,#000000,J000000,5000000,in 5 Mio. Jahren
+in ## Mio. Jahren,in JJ Mio. Jahren,in 50 Mio. Jahren,##000000,JJ000000,50000000,in 50 Mio. Jahren
+in ### Mio. Jahren,in JJJ Mio. Jahren,in 250 Mio. Jahren,###000000,JJJ000000,250000000,in 250 Mio. Jahren
+in #### Mio. Jahren,in JJJJ Mio. Jahren,in 1000 Mio. Jahren,####000000,JJJJ000000,1000000000,in 1000 Mio. Jahren
+vor # Mrd. Jahren,vor J Mrd. Jahren,vor 1 Mrd. Jahren,-#000000000,-J000000000,-1000000000,vor 1 Mrd. Jahren
+vor ## Mrd. Jahren,vor JJ Mrd. Jahren,vor 12 Mrd. Jahren,-##000000000,-JJ000000000,-12000000000,vor 12 Mrd. Jahren
+vor ### Mrd. Jahren,vor JJJ Mrd. Jahren,vor 123 Mrd. Jahren,-###000000000,-JJJ000000000,-123000000000,vor 123 Mrd. Jahren
+vor #### Mrd. Jahren,vor JJJJ Mrd. Jahren,vor 1234 Mrd. Jahren,-####000000000,-JJJJ000000000,-1234000000000,vor 1234 Mrd. Jahren
+in # Mrd. Jahren,in J Mrd. Jahren,in 1 Mrd. Jahren,#000000000,J000000000,1000000000,in 1 Mrd. Jahren
+in ## Mrd. Jahren,in JJ Mrd. Jahren,in 12 Mrd. Jahren,##000000000,JJ000000000,12000000000,in 12 Mrd. Jahren
+in ### Mrd. Jahren,in JJJ Mrd. Jahren,in 123 Mrd. Jahren,###000000000,JJJ000000000,123000000000,in 123 Mrd. Jahren
+in #### Mrd. Jahren,in JJJJ Mrd. Jahren,in 1234 Mrd. Jahren,####000000000,JJJJ000000000,1234000000000,in 1234 Mrd. Jahren
+vor # Billionen Jahren,vor J Billionen Jahren,vor 1 Billionen Jahren,-#000000000000,-J000000000000,-1000000000000,vor 1 Billionen Jahren
+vor ## Billionen Jahren,vor JJ Billionen Jahren,vor 12 Billionen Jahren,-##000000000000,-JJ000000000000,-12000000000000,vor 12 Billionen Jahren
+vor ### Billionen Jahren,vor JJJ Billionen Jahren,vor 123 Billionen Jahren,-###000000000000,-JJJ000000000000,-123000000000000,vor 123 Billionen Jahren
+vor #### Billionen Jahren,vor JJJJ Billionen Jahren,vor 1234 Billionen Jahren,-####000000000000,-JJJJ000000000000,-1234000000000000,vor 1234 Billionen Jahren
+in # Billionen Jahren,in J Billionen Jahren,in 1 Billionen Jahren,#000000000000,J000000000000,1000000000000,in 1 Billionen Jahren
+in ## Billionen Jahren,in JJ Billionen Jahren,in 12 Billionen Jahren,##000000000000,JJ000000000000,12000000000000,in 12 Billionen Jahren
+in ### Billionen Jahren,in JJJ Billionen Jahren,in 123 Billionen Jahren,###000000000000,JJJ000000000000,123000000000000,in 123 Billionen Jahren
+in #### Billionen Jahren,in JJJJ Billionen Jahren,in 1234 Billionen Jahren,####000000000000,JJJJ000000000000,1234000000000000,in 1234 Billionen Jahren

@@ -21,59 +21,56 @@ import java.util.regex.Pattern;
 /**
  * Tries to read desired strings from an input string. The input string is a
  * normalized string given to {@link TimeSpanParser}. The {@code tryTo*()}
- * methods are
- * used to attempt to read certain strings ({@code char}s, {@link String}s or
- * {@link Pattern}s) from a given position within the input string. The success
- * of
- * each attempt is indicated by an {@link AcceptResult}. If the attempt is
- * successful, the position within the input string is immediately moved to the
- * position
- * after the string just read.
+ * methods are used to attempt to read certain strings ({@code char}s,
+ * {@link String}s or {@link Pattern}s) from a given position within the input
+ * string. The success of each attempt is indicated by an {@link AcceptResult}. If
+ * the attempt is successful, the position within the input string is immediately
+ * moved to the position after the string just read.
  */
-class InputStringReader {
+final class InputStringReader {
 
     private final String inputString;
 
-    public InputStringReader(String inputString) {
+    InputStringReader(final String inputString) {
         this.inputString = inputString;
     }
 
-    public AcceptResult tryToAccept(Position p, char c) {
-        boolean isAccepted = p.get() < this.inputString.length() && this.inputString.charAt(p.get()) == c;
+    AcceptResult tryToAccept(final Position position, final char character) {
+        final boolean isAccepted = position.getPos() < this.inputString.length()
+                && this.inputString.charAt(position.getPos()) == character;
         String parsedInputString = null;
         if (isAccepted) {
-            parsedInputString = String.valueOf(c);
-            p.move(parsedInputString.length());
+            parsedInputString = String.valueOf(character);
+            position.move(parsedInputString.length());
         }
 
         return new AcceptResult(isAccepted, parsedInputString, null);
     }
 
-    public AcceptResult tryToAccept(Position p, String string) {
-        int startIndex = p.get();
-        int endIndex = p.get() + string.length();
-        boolean isAccepted = endIndex <= this.inputString.length()
+    AcceptResult tryToAccept(final Position position, final String string) {
+        final int startIndex = position.getPos();
+        final int endIndex = position.getPos() + string.length();
+        final boolean isAccepted = endIndex <= this.inputString.length()
                 && this.inputString.substring(startIndex, endIndex).equals(string);
         String parsedInputString = null;
         if (isAccepted) {
             parsedInputString = string;
-            p.move(parsedInputString.length());
+            position.move(parsedInputString.length());
         }
 
         return new AcceptResult(isAccepted, parsedInputString, null);
     }
 
-    public AcceptResult tryToAccept(Position p, Pattern pattern) {
-        final Matcher m = pattern.matcher(this.inputString);
-        m.region(p.get(), this.inputString.length());
-        boolean isAccepted = m.lookingAt();
+    AcceptResult tryToAccept(final Position position, final Pattern pattern) {
+        final Matcher matcher = pattern.matcher(this.inputString);
+        matcher.region(position.getPos(), this.inputString.length());
+        final boolean isAccepted = matcher.lookingAt();
         String parsedInputString = null;
         if (isAccepted) {
-            parsedInputString = m.group(0);
-            p.move(parsedInputString.length());
+            parsedInputString = matcher.group(0);
+            position.move(parsedInputString.length());
         }
 
-        return new AcceptResult(isAccepted, parsedInputString, m);
+        return new AcceptResult(isAccepted, parsedInputString, matcher);
     }
-
 }

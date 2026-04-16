@@ -20,32 +20,33 @@ import java.util.regex.Matcher;
 /**
  * Indicates whether an attempt to read a certain string from the input string
  * by {@link InputStringReader} was successful or not. If successful, the part
- * of
- * the input string just read can be returned, as well as the groups from the
+ * of the input string just read can be returned, as well as the groups from the
  * regular expression, if used.
  */
-class AcceptResult {
+final class AcceptResult {
 
     private final boolean isAccepted;
     private final String parsedInputString;
     private final Matcher matcher;
 
-    public AcceptResult(boolean isAccepted, String parsedInputString, Matcher matcher) {
+    AcceptResult(final boolean isAccepted, final String parsedInputString, final Matcher matcher) {
         this.isAccepted = isAccepted;
         this.parsedInputString = parsedInputString;
         this.matcher = matcher;
     }
 
-    public boolean isAccepted() {
+    boolean isAccepted() {
         return this.isAccepted;
     }
 
-    public String getParsedInputString() {
+    String getParsedInputString() {
         return this.parsedInputString;
     }
 
-    public String group(int group) {
+    /**
+     * Returns a regex capture group from the underlying matcher.
+     */
+    String group(final int group) {
         return this.matcher.group(group);
     }
-
 }

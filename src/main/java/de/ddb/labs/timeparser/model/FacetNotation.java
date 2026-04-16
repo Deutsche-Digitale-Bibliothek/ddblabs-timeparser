@@ -13,28 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package de.ddb.labs.timeparser.timespan;
+package de.ddb.labs.timeparser.model;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * Range qualifier attached to a parsed date expression.
+ * Human-readable facet metadata for a parsed time span.
  */
 @Getter
-final class Range {
-
-    private final String parsedInputString;
-    private final RangeType type;
-
-    /**
-     * Supported range semantics in normalized expressions.
-     */
-    enum RangeType {
-        FROM, BEFORE, UNTIL, AFTER, AROUND, PRESUMABLY
-    }
-
-    Range(final String parsedInputString, final RangeType type) {
-        this.parsedInputString = parsedInputString;
-        this.type = type;
-    }
+@AllArgsConstructor
+public final class FacetNotation {
+    private final String notation;
+    private final String prefLabelDe;
+    private final String prefLabelEn;
 }

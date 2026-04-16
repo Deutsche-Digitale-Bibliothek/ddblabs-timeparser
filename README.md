@@ -1,11 +1,23 @@
 # timeparser
 
-Java library for parsing textual time expressions into a compact machine-readable representation.
+Java 21 library for turning textual date expressions into machine-readable time spans, sortable day ranges, and DDB facet ids.
+
+## What it does
+
+Given input such as `Mai 2010`, `15. Jh.`, or `vor 500 Mio. Jahren`, the parser can produce:
+
+- a compact legacy string like `time_62100|time_62110 2455318|2455348`
+- a structured result object with normalization and error metadata
+- an HTTP JSON response via the embedded demo server
+
+The `time_XXX` identifiers refer to the DDB Zeitvokabular and are publicly browsable here:
+
+- DDB Zeitvokabular: https://xtree-public.digicult-verbund.de/vocnet/?uriVocItem=http://ddb.vocnet.org/zeitvokabular/&startNode=dat00113&lang=de&d=n
 
 ## Requirements
 
 - Java 21
-- Maven Wrapper or Maven 3.9+
+- Maven Wrapper included, or Maven 3.9+
 
 ## Maven
 
@@ -17,40 +29,42 @@ Java library for parsing textual time expressions into a compact machine-readabl
 </dependency>
 ```
 
-## Usage
+## Quick start
 
 ```java
 import de.ddb.labs.timeparser.TimeParser;
 import de.ddb.labs.timeparser.TimeParser.IndexDaysMode;
 
-public class Example {
-    public static void main(String[] args) {
-        TimeParser parser = TimeParser.getInstance();
+TimeParser parser = TimeParser.getInstance();
 
-        // Default: Julian Day output index
-        String julian = parser.parseTime("-20000-02-21");
-
-        // Optional: legacy day-index behavior for compatibility
-        String legacy = parser.parseTime("-20000-02-21", IndexDaysMode.LEGACY);
-
-        System.out.println(julian);
-        System.out.println(legacy);
-    }
-}
+String julian = parser.parseTime("Mai 2010");
+String legacy = parser.parseTime("Mai 2010", IndexDaysMode.LEGACY);
 ```
 
-Expected output (Julian default):
+`parseTime(...)` is the fail-safe API: it returns `""` on parse failure.
+For debugging or integration code, prefer `parseTimeResult(...)`.
+
+## Output model
+
+The compact output format is:
 
 ```text
-time_18000 -5583373|-5583373
+<facetString> <startIndexDay>|<endIndexDay>
 ```
 
-## IndexDaysMode
+Example:
 
-`parseTime(...)` supports two day-index strategies:
+```text
+time_62100|time_62110 2455318|2455348
+```
 
-- `JULIAN_DAY` (default): based on `JulianFields.JULIAN_DAY`.
-- `LEGACY`: historical compatibility mode.
+Meaning:
+
+- `facetString`: pipe-separated DDB Zeitvokabular ids
+- `startIndexDay` / `endIndexDay`: sortable numeric day bounds
+- default index mode is `JULIAN_DAY`; `LEGACY` is kept for compatibility
+
+## Structured API
 
 Available overloads:
 
@@ -59,47 +73,66 @@ String parseTime(String input)
 String parseTime(String input, IndexDaysMode mode)
 String parseTime(String input, String contextId)
 String parseTime(String input, String contextId, IndexDaysMode mode)
+
+ParseResult parseTimeResult(String input)
+ParseResult parseTimeResult(String input, IndexDaysMode mode)
+ParseResult parseTimeResult(String input, String contextId)
+ParseResult parseTimeResult(String input, String contextId, IndexDaysMode mode)
 ```
 
-## Error Handling and Logging
+Useful `ParseResult` fields:
 
-Important behavior:
+- `successful`
+- `normalizedInput`
+- `matchingRules` / `matchedRule`
+- `transformedInput`
+- `timeSpan`
+- `facetString`
+- `startIndexDay` / `endIndexDay`
+- `errorType` / `errorMessage`
 
-- `parseTime(...)` never throws; on failure it returns `""`.
-- Errors are aggregated by type and rate-limited in logs:
-  - first occurrence: detailed warning,
-  - then summary every 100 occurrences.
-- Stack traces are only logged on debug level when `-Dtimeparser.logStacktraces=true` is set.
+Errors are aggregated internally and can be inspected via `getErrorStats()`.
 
-Monitoring API:
+## CSV-driven knowledge base
 
-```java
-TimeParser parser = TimeParser.getInstance();
-Map<String, TimeParser.ParseErrorStats> stats = parser.getErrorStats();
-parser.resetErrorStats();
-```
+The parser behavior is data-driven:
 
-## HTTP Demo Server
+- [src/main/resources/conf/timeparser/rules.csv](src/main/resources/conf/timeparser/rules.csv) — maps input masks and patterns to normalized parser expressions
+- [src/main/resources/conf/timeparser/normalizations.csv](src/main/resources/conf/timeparser/normalizations.csv) — regex pre-normalization plus literal month/weekday token replacements
+- [src/main/resources/conf/timeparser/facets.csv](src/main/resources/conf/timeparser/facets.csv) — maps year ranges to DDB facet ids and labels
 
-The project contains a minimal embedded HTTP server in `de.ddb.labs.timeparser.TimeParserHttpServer`.
+In short: code provides the parsing engine, CSV files provide most of the vocabulary and transformation knowledge.
 
-Build and start it locally:
+All `rules.csv` examples are regression-tested in [src/test/java/de/ddb/labs/timeparser/TimeParserTest.java](src/test/java/de/ddb/labs/timeparser/TimeParserTest.java).
+
+## Semantics and limits
+
+A few important caveats:
+
+- the parser is optimized for historical and catalog-style date strings, not arbitrary natural language
+- exactly one rule must match after normalization; ambiguous inputs are rejected
+- disjoint expressions such as `1944/1945,1949` are currently rejected
+- very large years are bounded by `java.time.LocalDate`
+- inputs up to `999999999` and `-1000000000` are supported in the current implementation; larger magnitudes return `""` through the fail-safe API
+- the fail-safe `parseTime(...)` methods return `""` on errors; if you need diagnostics, use `parseTimeResult(...)`
+- request input is intentionally capped at 2048 characters to protect the parser from excessive memory and CPU pressure
+- diagnostic logging and stored error-stat values are abbreviated to keep monitoring data bounded
+
+## HTTP demo server
+
+The project ships with a minimal Javalin-based HTTP wrapper in `de.ddb.labs.timeparser.TimeParserHttpServer`.
+
+Build and run:
 
 ```bash
 ./mvnw -q -DskipTests package
-TIMEPARSER_HOST=127.0.0.1 TIMEPARSER_PORT=8080 java -jar target/timeparser-2.0.0-SNAPSHOT.jar
+java -jar target/timeparser-2.0.0-SNAPSHOT-shaded.jar
 ```
 
-Configuration:
+Optional environment variables:
 
-- Host: `TIMEPARSER_HOST`, default `127.0.0.1`
-- Port: `TIMEPARSER_PORT`, default `8080`
-
-Optional JVM properties are still supported:
-
-```bash
-java -Dserver.host=127.0.0.1 -Dserver.port=8080 -jar target/timeparser-2.0.0-SNAPSHOT.jar
-```
+- `TIMEPARSER_HOST` — default `127.0.0.1`
+- `TIMEPARSER_PORT` — default `8080`
 
 Request:
 
@@ -107,44 +140,48 @@ Request:
 GET /?date=Mai%202010&indexDaysMode=JULIAN_DAY
 ```
 
-Query parameters:
-
-- `date`: required input string to parse
-- `indexDaysMode`: optional, one of `JULIAN_DAY` or `LEGACY`
-- `indexDayMode`: optional legacy alias for `indexDaysMode`
-
-Example response:
+Successful response shape:
 
 ```json
 {
-    "input": "Mai 2010",
-    "output": "time_62100|time_62110 2455318|2455348"
+  "successful": true,
+  "input": "Mai 2010",
+  "indexDaysMode": "JULIAN_DAY",
+  "normalizedInput": "MM 2010",
+  "transformedInput": "2010-05",
+  "timeSpan": {
+    "parsedInputString": "2010-05",
+    "startISODate": "2010-05-01",
+    "endISODate": "2010-05-31"
+  },
+  "facetString": "time_62100|time_62110",
+  "startIndexDay": 2455318,
+  "endIndexDay": 2455348,
+  "output": "time_62100|time_62110 2455318|2455348"
 }
 ```
 
-The server responds with `application/json`, sets `Vary: Accept-Encoding`, and enables gzip compression.
+Notes:
+
+- `startISODate` and `endISODate` make the wire format explicit: these are ISO-serialized calendar dates
+- empty strings and empty arrays are omitted from failure JSON
+- `errorType` and `errorMessage` are only present on failures
+
+## Build, test, package
+
+```bash
+./mvnw test
+./mvnw -DskipTests package
+```
+
+The `package` goal also produces a runnable shaded jar:
+
+- `target/timeparser-2.0.0-SNAPSHOT-shaded.jar`
 
 ## Docker
 
-Build the image:
-
 ```bash
 docker build -t timeparser .
+docker run --rm -p 8080:8080 -e TIMEPARSER_HOST=0.0.0.0 -e TIMEPARSER_PORT=8080 timeparser
 ```
 
-Run it:
-
-```bash
-docker run --rm -p 8080:8080 \
-    -e TIMEPARSER_HOST=0.0.0.0 \
-    -e TIMEPARSER_PORT=8080 \
-    timeparser
-```
-
-The container runs as a non-root user.
-
-Example request:
-
-```bash
-curl --compressed 'http://127.0.0.1:8080/?date=Mai%202010&indexDaysMode=JULIAN_DAY'
-```
