@@ -1,0 +1,9 @@
+de.ddb.labs.timeparser
+de.ddb.labs.timeparser.data
+de.ddb.labs.timeparser.facet
+de.ddb.labs.timeparser.http
+de.ddb.labs.timeparser.internal
+de.ddb.labs.timeparser.model
+de.ddb.labs.timeparser.replacement
+de.ddb.labs.timeparser.rule
+de.ddb.labs.timeparser.timespan
