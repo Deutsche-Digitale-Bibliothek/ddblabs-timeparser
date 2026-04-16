@@ -103,8 +103,7 @@ jobs:
         run: ./mvnw --batch-mode -P release deploy
 
   pages:
-    if: github.event_name == 'release'
-    needs: publish
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write

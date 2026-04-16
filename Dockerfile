@@ -1,4 +1,4 @@
-FROM maven:3.9.11-eclipse-temurin-21 AS build
+FROM maven:3-eclipse-temurin-21 AS build
 WORKDIR /workspace
 
 COPY pom.xml mvnw ./
@@ -6,7 +6,7 @@ COPY .mvn .mvn
 COPY src src
 
 RUN chmod +x mvnw \
-	&& ./mvnw -q -DskipTests package \
+	&& MAVEN_CONFIG='' ./mvnw -q -DskipTests package \
 	&& cp target/*-shaded.jar target/timeparser.jar
 
 FROM eclipse-temurin:21-jre-jammy
