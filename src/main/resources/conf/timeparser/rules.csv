@@ -1,4 +1,4 @@
-input mask,input pattern,input example,output mask,output pattern,output example,test
+input mask,input pattern,input example,output mask,output pattern,output example,test,output example ISO
 #### ?,JJJJ ?,1923 ?,ca. ####,ca. JJJJ,ca. 1923,ca. 1923
 ####-####/####,JJJJ-ZZZZ/YYYY,1944-1945/1949,"####/####,####","JJJJ/ZZZZ,YYYY","1944/1945,1949","1944/1945,1949"
 ####/###,JJJJ/ZZZ,2005/006,####/####,JJJJ/JZZZ,2005/2006,2005/2006
@@ -332,3 +332,10 @@ in # Billionen Jahren,in J Billionen Jahren,in 1 Billionen Jahren,#000000000000,
 in ## Billionen Jahren,in JJ Billionen Jahren,in 12 Billionen Jahren,##000000000000,JJ000000000000,12000000000000,in 12 Billionen Jahren
 in ### Billionen Jahren,in JJJ Billionen Jahren,in 123 Billionen Jahren,###000000000000,JJJ000000000000,123000000000000,in 123 Billionen Jahren
 in #### Billionen Jahren,in JJJJ Billionen Jahren,in 1234 Billionen Jahren,####000000000000,JJJJ000000000000,1234000000000000,in 1234 Billionen Jahren
+####er Jahre,JJJJer Jahre,1970er Jahre,####/####,JJJ0/JJJ9,1970/1979,NA,1970-01-01/1979-12-31
+##.####,MM.JJJJ,12.1948,####-##,JJJJ-MM,1948-12,NA,1948-12-01/1948-12-31
+#### – ####,JJJJ – JJJJ,1946 – 1950,####/####,JJJJ/JJJJ,1946/1950,NA,1946-01-01/1950-12-31
+PP – PP ####,MM – YY JJJJ,März – Dez. 1949,####-##/####-##,JJJJ-MM/ZZZZ-YY,1949-03/1949-12,NA,1949-03-01/1949-12-31
+PP #### – PP ####,MM JJJJ – YY ZZZZ,Sept. 1946 – Jan. 1947,####-##/####-##,JJJJ-MM/ZZZZ-YY,1946-09/1947-01,NA,1946-09-01/1947-01-31
+## – ## PP ####,TT – TT MM JJJJ,16. – 17. März 1949,####-##-##/####-##-##,JJJJ-MM-TT/ZZZZ-YY-XX,1949-03-16/1949-03-17,NA,1949-03-16/1949-03-17
+##-##-####,TT-MM-JJJJ,01-01-1900,####-##-##,JJJJ-MM-TT,1900-01-01,NA,1900-01-01
