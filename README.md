@@ -173,30 +173,15 @@ Errors are aggregated internally and can be inspected via `getErrorStats()`.
 
 ## CSV-driven knowledge base
 
-The parser behavior is data-driven:
+The parser behavior is data-driven. Code provides the parsing engine; the CSV files provide vocabulary and transformation knowledge.
 
-- [src/main/resources/conf/timeparser/rules.csv](src/main/resources/conf/timeparser/rules.csv) — maps input masks and patterns to normalized parser expressions
-- [src/main/resources/conf/timeparser/normalizations.csv](src/main/resources/conf/timeparser/normalizations.csv) — regex pre-normalization plus literal month/weekday token replacements
-- [src/main/resources/conf/timeparser/facets.csv](src/main/resources/conf/timeparser/facets.csv) — maps year ranges to DDB facet ids and labels
+| File | Role |
+|------|------|
+| [rules.csv](src/main/resources/conf/timeparser/rules.csv) | 346 rules mapping input masks and patterns to normalized parser expressions |
+| [normalizations.csv](src/main/resources/conf/timeparser/normalizations.csv) | Regex replacements (Step 1) and literal month/weekday token substitutions (Step 2) |
+| [facets.csv](src/main/resources/conf/timeparser/facets.csv) | 110 entries mapping year ranges to DDB Zeitvokabular facet ids and labels |
 
-In short: code provides the parsing engine, CSV files provide most of the vocabulary and transformation knowledge.
-
-All `rules.csv` examples are regression-tested in [src/test/java/de/ddb/labs/timeparser/TimeParserTest.java](src/test/java/de/ddb/labs/timeparser/TimeParserTest.java).
-
-### rules.csv format
-
-Each row has eight columns (the first row is a header and is skipped):
-
-| Column | Name | Description |
-|--------|------|-------------|
-| 0 | Input mask | Character-by-character type annotation for the input string |
-| 1 | Input pattern | Concrete variable names aligned with the mask |
-| 2 | Input example | A sample input string that must match and parse correctly |
-| 3 | Output mask | Character-by-character type annotation for the output string |
-| 4 | Output pattern | Concrete variable names aligned with the output mask |
-| 5 | Output example | Expected result of applying this rule to the input example |
-| 6 | Test | `NA` (currently unused) |
-| 7 | Output example ISO | Optional. If non-empty: expected `startDate/endDate` from the full pipeline as ISO-8601 dates, separated by `/` |
+All `rules.csv` input examples are regression-tested in [src/test/java/de/ddb/labs/timeparser/TimeParserTest.java](src/test/java/de/ddb/labs/timeparser/TimeParserTest.java). For CSV file formats, design principles, and guidance on extending the knowledge base, see [src/main/resources/conf/timeparser/README.md](src/main/resources/conf/timeparser/README.md).
 
 ### Mask and pattern syntax
 

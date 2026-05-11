@@ -7,7 +7,20 @@ from,to,type,comment
 (?i)\bMilliard(?:e|en)(?=\s|$),Mrd.,normalization,normalize milliard word variants
 (?i)\bBill\.?(?=\s|$),Billionen,normalization,normalize billion abbreviation variants
 (?i)\bBillion(?:en)?(?=\s|$),Billionen,normalization,normalize billion word variants
+(?i)\betwa\b,circa,normalization,normalize approx. marker 'etwa' to canonical form 'circa'; design: two canonical uncertainty markers in rules.csv: 'um' (~+-5y broad) and 'circa' (~+-2y moderate); cluster 'circa': etwa / wohl / vermutlich / wahrscheinlich / ungefaehr / vorwiegend -> circa; 'um' and 'ca.' keep their own distinct rule families
+(?i)\bwohl\b,circa,normalization,normalize uncertainty marker 'wohl' to canonical form 'circa' (e.g. 'wohl 1923' -> 'circa 1923')
+(?i)\bvermutlich\b,circa,normalization,normalize uncertainty marker 'vermutlich' to canonical form 'circa'
+(?i)\bvermutl\.,circa,normalization,normalize uncertainty marker 'vermutl.' to canonical form 'circa'
+(?i)\bwahrscheinlich\b,circa,normalization,normalize uncertainty marker 'wahrscheinlich' to canonical form 'circa'
+(?i)\bwahrscheinl\.,circa,normalization,normalize uncertainty marker 'wahrscheinl.' to canonical form 'circa'
+(?i)\bwahrsch\.,circa,normalization,normalize uncertainty marker 'wahrsch.' to canonical form 'circa'
+(?i)\bungefähr\b,circa,normalization,normalize uncertainty marker 'ungefähr' to canonical form 'circa'
+(?i)\bungef\.,circa,normalization,normalize uncertainty marker 'ungef.' to canonical form 'circa'
+(?i)\bvorwiegend\b,circa,normalization,normalize uncertainty marker 'vorwiegend' to canonical form 'circa'
+(?i)\bvorw\.,circa,normalization,normalize uncertainty marker 'vorw.' to canonical form 'circa'
+(?i)\b(?:Band|Bd\.|Bd|Nummer|Nr\.|Nr|Teil)\s+\d{1,3}\b,,normalization,strip volume/number annotations before dates (e.g. 'Bd. 1 1950' -> '1950'; 'Nr. 3 1960' -> '1960')
 Januar,01,month,full month name
+Jänner,01,month,full month name
 Februar,02,month,full month name
 März,03,month,full month name
 April,04,month,full month name
@@ -20,27 +33,41 @@ Oktober,10,month,full month name
 November,11,month,full month name
 Dezember,12,month,full month name
 Jan.,01,month,abbreviation with dot
+Jän.,01,month,abbreviation with dot
 Feb.,02,month,abbreviation with dot
+Febr.,02,month,abbreviation with dot
 Mrz.,03,month,abbreviation with dot
+Mär.,03,month,abbreviation with dot
+Mar.,03,month,abbreviation with dot
 Apr.,04,month,abbreviation with dot
 Jun.,06,month,abbreviation with dot
 Jul.,07,month,abbreviation with dot
 Aug.,08,month,abbreviation with dot
 Sept.,09,month,abbreviation with dot
+Sep.,09,month,abbreviation with dot
 Okt.,10,month,abbreviation with dot
+Oct.,10,month,abbreviation with dot
 Nov.,11,month,abbreviation with dot
 Dez.,12,month,abbreviation with dot
+Dec.,12,month,abbreviation with dot
 Jan,01,month,abbreviation without dot
+Jän,01,month,abbreviation without dot
 Feb,02,month,abbreviation without dot
+Febr,02,month,abbreviation without dot
 Mrz,03,month,abbreviation without dot
+Mär,03,month,abbreviation without dot
+Mar,03,month,abbreviation without dot
 Apr,04,month,abbreviation without dot
 Jun,06,month,abbreviation without dot
 Jul,07,month,abbreviation without dot
 Aug,08,month,abbreviation without dot
 Sept,09,month,abbreviation without dot
+Sep,09,month,abbreviation without dot
 Okt,10,month,abbreviation without dot
+Oct,10,month,abbreviation without dot
 Nov,11,month,abbreviation without dot
 Dez,12,month,abbreviation without dot
+Dec,12,month,abbreviation without dot
 Montag,GG,weekday,weekday token
 Dienstag,GG,weekday,weekday token
 Mittwoch,GG,weekday,weekday token
