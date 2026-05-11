@@ -35,15 +35,16 @@ import org.apache.commons.csv.CSVRecord;
  * <ul>
  * <li>The first line in the file is ignored and can be used as a header
  * line.</li>
- * <li>Each line must consist of seven CSV columns.
- * The columns must correspond to the following, in the specified order:
+ * <li>Each line must consist of eight CSV columns in the following order:
  * <ol>
  * <li>Input specification mask</li>
  * <li>Input specification pattern</li>
  * <li>Example input string</li>
+ * <li>Tokenized example (after Steps 1+2: normalization and month/weekday tokenization)</li>
  * <li>Output specification mask</li>
  * <li>Output specification pattern</li>
  * <li>Required output string for the example input string</li>
+ * <li>Expected ISO date range from the full pipeline (start/end, may be empty)</li>
  * </ol>
  * </li>
  * </ul>
@@ -77,8 +78,8 @@ public final class RuleReader {
             try (final CSVParser parser = CSVParser.parse(new InputStreamReader(in, charsetName), format)) {
                 for (final CSVRecord record : parser) {
                     final int lineNumber = Math.toIntExact(record.getRecordNumber());
-                    if (record.size() < 7) {
-                        final String errorMsg = "Expected 7 columns instead of " + record.size() + " in rule file \""
+                    if (record.size() < 8) {
+                        final String errorMsg = "Expected 8 columns instead of " + record.size() + " in rule file \""
                                 + path + "\", line " + lineNumber + ": \"" + record + "\"";
                         throw new ParseException(errorMsg, lineNumber);
                     }
@@ -86,8 +87,10 @@ public final class RuleReader {
                     final String inputMask = record.get(0);
 
                     if (inputMasks.add(inputMask)) {
+                        // col 0=inputMask, 1=inputPattern, 2=inputExample, 3=tokenizedExample,
+                        // col 4=outputMask, 5=outputPattern, 6=outputExample, 7=outputExampleIso
                         rules.add(new Rule(record.get(0), record.get(1), record.get(2), record.get(3),
-                                record.get(4), record.get(5), record.get(6)));
+                                record.get(4), record.get(5), record.get(6), record.get(7)));
                     }
                 }
             }

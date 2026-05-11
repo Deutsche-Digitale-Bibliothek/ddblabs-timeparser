@@ -309,9 +309,9 @@ public final class TimeParser {
      */
     private ParseResult doParseTimeResult(final String input, final String contextId, final IndexDaysMode indexDaysMode)
             throws Exception {
-        final String preprocessedInput = applyConfiguredNormalizations(input);
-        final String normalizedInput = normalizeInputAfterConfiguredNormalizations(preprocessedInput);
-        final List<Rule> matchingRules = findRulesForNormalizedInput(normalizedInput);
+        final String preprocessedInput = applyNormalizationRules(input);
+        final String normalizedInput = tokenizeMonthsAndWeekdays(preprocessedInput);
+        final List<Rule> matchingRules = findMatchingRules(normalizedInput);
         if (matchingRules.size() > 1) {
             final String message = "Multiple rules found for input string \"" + input + "\"";
             logParseFailure(contextId, input, message, null);
@@ -321,7 +321,7 @@ public final class TimeParser {
         }
 
         final Rule matchedRule = matchingRules.isEmpty() ? null : matchingRules.get(0);
-        final String transformedInput = matchedRule == null ? preprocessedInput : transform(preprocessedInput, matchedRule);
+        final String transformedInput = matchedRule == null ? preprocessedInput : applyRule(preprocessedInput, matchedRule);
         final TimeSpan timeSpan = TIME_SPAN_PARSER.parse(transformedInput);
         return buildParseResult(input, contextId, indexDaysMode, normalizedInput, matchingRules, matchedRule,
                 transformedInput, timeSpan);
@@ -330,10 +330,10 @@ public final class TimeParser {
     private ParseResult buildParseResult(final String input, final String contextId, final IndexDaysMode indexDaysMode,
             final String normalizedInput, final List<Rule> matchingRules, final Rule matchedRule,
             final String transformedInput, final TimeSpan timeSpan) {
-        final List<FacetNotation> facetNotations = collectFacetNotations(timeSpan);
-        final String facetString = createFacetString(facetNotations);
-        final long startDays = toIndexDays(timeSpan.getStartDate(), indexDaysMode);
-        final long endDays = toIndexDays(timeSpan.getEndDate(), indexDaysMode);
+        final List<FacetNotation> facetNotations = resolveFacetNotations(timeSpan);
+        final String facetString = buildFacetString(facetNotations);
+        final long startDays = computeIndexDay(timeSpan.getStartDate(), indexDaysMode);
+        final long endDays = computeIndexDay(timeSpan.getEndDate(), indexDaysMode);
         final String output = facetString + " " + startDays + "|" + endDays;
 
         return ParseResult.success(input, contextId, indexDaysMode, normalizedInput, matchingRules, matchedRule,
@@ -342,19 +342,31 @@ public final class TimeParser {
 
     /**
      * Applies a selected rule to the raw input and produces the normalized parser
-     * expression.
+     * expression (step 4 of the pipeline).
+     *
+     * @param input raw or pre-normalized input string
+     * @param rule  the rule to apply
+     * @return transformed input ready for {@link de.ddb.labs.timeparser.timespan.TimeSpanParser}
      */
-    private String transform(final String normalizedInput, final Rule rule) throws Exception {
+    public String applyRule(final String input, final Rule rule) throws Exception {
         final InputParser inputParser = inputParsersByRule.get(rule);
         final Outputter outputter = outputtersByRule.get(rule);
         if (inputParser == null || outputter == null) {
             throw new IllegalStateException("No compiled parser state found for rule: " + rule);
         }
-        return outputter.createOutputString(inputParser.parseInputString(normalizedInput));
+        return outputter.createOutputString(inputParser.parseInputString(input));
     }
 
-    private List<Rule> findRulesForNormalizedInput(final String normalizedInput) {
-        final List<RuleCandidate> foundRules = cleanupRules(getRuleCandidates(normalizedInput));
+    /**
+     * Finds all rules whose input mask matches the given tokenized input (step 3 of the pipeline).
+     * The input must already have month/weekday names replaced by their tokens (see
+     * {@link #tokenizeMonthsAndWeekdays(String)}).
+     *
+     * @param tokenizedInput normalized input with month/weekday tokens
+     * @return matching rules; empty list if none match, more than one indicates an ambiguity
+     */
+    public List<Rule> findMatchingRules(final String tokenizedInput) {
+        final List<RuleCandidate> foundRules = cleanupRules(getRuleCandidates(tokenizedInput));
         final List<Rule> matchingRules = new ArrayList<>(foundRules.size());
         for (final RuleCandidate candidate : foundRules) {
             matchingRules.add(candidate.getRule());
@@ -363,21 +375,35 @@ public final class TimeParser {
     }
 
     /**
-     * Normalizes known spelling variants and then replaces month and weekday
-     * literals with cheap matching markers.
+     * Runs both normalization steps in sequence (convenience for internal use).
      */
     private String normalizeInput(final String input) {
-        return normalizeInputAfterConfiguredNormalizations(applyConfiguredNormalizations(input));
+        return tokenizeMonthsAndWeekdays(applyNormalizationRules(input));
     }
 
-    private String normalizeInputAfterConfiguredNormalizations(final String input) {
-        String normalizedInput = input;
-        normalizedInput = Replacement.replaceAllWith(normalizedInput, MONTH_REPLACEMENTS, "MM");
-        normalizedInput = Replacement.replaceAllWith(normalizedInput, WEEKDAY_REPLACEMENTS, "GG");
-        return normalizedInput;
+    /**
+     * Replaces month and weekday names with cheap matching tokens (step 2 of the pipeline).
+     * Call this after {@link #applyNormalizationRules(String)}.
+     *
+     * @param preprocessedInput output of {@link #applyNormalizationRules(String)}
+     * @return input with month names replaced by {@code MM} and weekday names by {@code GG}
+     */
+    public String tokenizeMonthsAndWeekdays(final String preprocessedInput) {
+        String result = preprocessedInput;
+        result = Replacement.replaceAllWith(result, MONTH_REPLACEMENTS, "MM");
+        result = Replacement.replaceAllWith(result, WEEKDAY_REPLACEMENTS, "GG");
+        return result;
     }
 
-    private String applyConfiguredNormalizations(final String input) {
+    /**
+     * Applies all entries from {@code normalizations.csv} to the raw input (step 1 of the pipeline).
+     * This expands abbreviations, canonical spelling variants, and century/millennium expressions
+     * before rule matching.
+     *
+     * @param input raw input string
+     * @return pre-normalized input ready for {@link #tokenizeMonthsAndWeekdays(String)}
+     */
+    public String applyNormalizationRules(final String input) {
         return Replacement.applyAll(input, inputNormalizations);
     }
 
@@ -455,7 +481,13 @@ public final class TimeParser {
         return smallestNumberOfHashes;
     }
 
-    private List<FacetNotation> collectFacetNotations(final TimeSpan timeSpan) {
+    /**
+     * Looks up all DDB Zeitvokabular facets that overlap with the given time span (step 5 of the pipeline).
+     *
+     * @param timeSpan the parsed time span
+     * @return matching facet notations in chronological order
+     */
+    public List<FacetNotation> resolveFacetNotations(final TimeSpan timeSpan) {
         final Map<String, FacetNotation> facetTokens = new LinkedHashMap<>();
         final int startYear = toFacetYear(timeSpan.getStartDate());
         final int endYear = toFacetYear(timeSpan.getEndDate());
@@ -472,22 +504,35 @@ public final class TimeParser {
         return new ArrayList<>(facetTokens.values());
     }
 
-    private String createFacetString(final List<FacetNotation> facetTokens) {
-        if (facetTokens.isEmpty()) {
+    /**
+     * Builds the pipe-separated facet id string from a list of notations (step 5b of the pipeline).
+     *
+     * @param facetNotations result of {@link #resolveFacetNotations(TimeSpan)}
+     * @return e.g. {@code "time_62100|time_62110"}, or empty string if the list is empty
+     */
+    public String buildFacetString(final List<FacetNotation> facetNotations) {
+        if (facetNotations.isEmpty()) {
             return EMPTY_RESULT;
         }
 
         final StringBuilder facetString = new StringBuilder();
-        for (final FacetNotation facetToken : facetTokens) {
+        for (final FacetNotation facetNotation : facetNotations) {
             if (facetString.length() > 0) {
                 facetString.append('|');
             }
-            facetString.append(facetToken.getNotation());
+            facetString.append(facetNotation.getNotation());
         }
         return facetString.toString();
     }
 
-    private long toIndexDays(final LocalDate date, final IndexDaysMode indexDaysMode) {
+    /**
+     * Converts a calendar date to a sortable index day number (step 6 of the pipeline).
+     *
+     * @param date         the start or end date of a time span
+     * @param indexDaysMode {@link IndexDaysMode#JULIAN_DAY} (default) or {@link IndexDaysMode#LEGACY}
+     * @return sortable day number
+     */
+    public long computeIndexDay(final LocalDate date, final IndexDaysMode indexDaysMode) {
         if (indexDaysMode == IndexDaysMode.LEGACY) {
             return getDateAsIndexDays(date);
         }

@@ -31,19 +31,22 @@ public class Rule {
     private final String inputMask;
     private final String inputPattern;
     private final String inputExample;
+    private final String tokenizedExample;
     private final String outputMask;
     private final String outputPattern;
     private final String outputExample;
-    private final String test;
+    private final String outputExampleIso;
 
-    public Rule(final String inputMask, final String inputPattern, final String inputExample, final String outputMask,
-            final String outputPattern, final String outputExample, final String test) {
+    public Rule(final String inputMask, final String inputPattern, final String inputExample,
+            final String tokenizedExample, final String outputMask, final String outputPattern,
+            final String outputExample, final String outputExampleIso) {
         this.inputMask = inputMask;
         this.inputPattern = inputPattern;
         this.inputExample = inputExample;
+        this.tokenizedExample = tokenizedExample;
         this.outputMask = outputMask;
         this.outputPattern = outputPattern;
         this.outputExample = outputExample;
-        this.test = test;
+        this.outputExampleIso = outputExampleIso;
     }
 }

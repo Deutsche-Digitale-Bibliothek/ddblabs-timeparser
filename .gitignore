@@ -17,3 +17,5 @@ buildNumber.properties
 .classpath
 /.vscode
 /*.txt
+**.py
+src/test/java/de/ddb/labs/timeparser/MigrateRulesCsv.java

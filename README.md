@@ -64,6 +64,85 @@ Meaning:
 - `startIndexDay` / `endIndexDay`: sortable numeric day bounds
 - default index mode is `JULIAN_DAY`; `LEGACY` is kept for compatibility
 
+## Parsing pipeline
+
+Every input passes through six steps. Each step is now a public method on `TimeParser` so you can call, test, or inspect them individually.
+
+```
+Raw input string
+       │
+       ▼  Step 1: applyNormalizationRules(input)
+       │  normalizations.csv — expands abbreviations, spelling variants,
+       │  century/millennium expressions
+       │  e.g. "200000000 v. Chr."  →  "-200000000"
+       │       "15. Jh."            →  "15. Jahrhundert"
+       ▼
+       │  Step 2: tokenizeMonthsAndWeekdays(preprocessed)
+       │  Replaces month and weekday names with match tokens
+       │  e.g. "März 2010"  →  "MM 2010"
+       ▼
+       │  Step 3: findMatchingRules(tokenized)    ← rules.csv
+       │  Selects exactly one input mask; returns empty list (→ error)
+       │  or more than one (→ MULTIPLE_RULES error)
+       ▼
+       │  Step 4: applyRule(preprocessed, rule)
+       │  Applies the matched output pattern
+       │  e.g. "1923 ?"  →  "ca. 1923"
+       │       "MM 2010" →  "2010-05"           (transformedInput)
+       ▼
+       │  Step 5: new TimeSpanParser().parse(transformedInput)
+       │  Converts the canonical expression to a concrete date range
+       │  e.g. startDate=2010-05-01, endDate=2010-05-31   (TimeSpan)
+       ▼
+       │  Step 6a: resolveFacetNotations(timeSpan) ← facets.csv
+       │           buildFacetString(facetNotations)
+       │           e.g. "time_62100|time_62110"
+       │
+       │  Step 6b: computeIndexDay(date, indexDaysMode)
+       │           Julian Day Number (default) or legacy algorithm
+       │           e.g. startIndexDay=2455318, endIndexDay=2455348
+       ▼
+  "time_62100|time_62110 2455318|2455348"
+```
+
+### Calling individual steps
+
+```java
+TimeParser p = TimeParser.getInstance();
+
+// Step 1: applyNormalizationRules — normalizations.csv
+String preprocessed = p.applyNormalizationRules("März 2010");
+// → "März 2010"  (no normalization rule matches this input)
+
+// Step 2: tokenizeMonthsAndWeekdays — month/weekday tokenization
+String tokenized = p.tokenizeMonthsAndWeekdays(preprocessed);
+// → "MM 2010"
+
+// Step 3: findMatchingRules — rule matching
+List<Rule> rules = p.findMatchingRules(tokenized);
+Rule rule = rules.get(0);
+
+// Step 4: applyRule — rule application (uses preprocessed, not tokenized)
+String transformedInput = p.applyRule(preprocessed, rule);
+// → "2010-03"
+
+// Step 5: TimeSpanParser.parse — time span parsing
+TimeSpan span = new TimeSpanParser().parse(transformedInput);
+LocalDate start = span.getStartDate();  // 2010-03-01
+LocalDate end   = span.getEndDate();    // 2010-03-31
+
+// Step 6a: resolveFacetNotations + buildFacetString
+List<FacetNotation> notations = p.resolveFacetNotations(span);
+String facetString = p.buildFacetString(notations);
+// → "time_62100|time_62110"
+
+// Step 6b: computeIndexDay — index day
+long startDay = p.computeIndexDay(start, TimeParser.IndexDaysMode.JULIAN_DAY);
+long endDay   = p.computeIndexDay(end,   TimeParser.IndexDaysMode.JULIAN_DAY);
+```
+
+For end-to-end parsing without inspecting intermediate steps, use `parseTimeResult(...)` which returns all of the above fields pre-computed in a single `ParseResult`.
+
 ## Structured API
 
 Available overloads:
@@ -82,14 +161,13 @@ ParseResult parseTimeResult(String input, String contextId, IndexDaysMode mode)
 
 Useful `ParseResult` fields:
 
-- `successful`
-- `normalizedInput`
-- `matchingRules` / `matchedRule`
-- `transformedInput`
-- `timeSpan`
-- `facetString`
-- `startIndexDay` / `endIndexDay`
-- `errorType` / `errorMessage`
+- `normalizedInput` — after step 1
+- `matchingRules` / `matchedRule` — after step 3
+- `transformedInput` — after step 4
+- `timeSpan` — after step 5
+- `facetString` / `facetNotations` — after step 6a
+- `startIndexDay` / `endIndexDay` — after step 6b
+- `successful` / `errorType` / `errorMessage`
 
 Errors are aggregated internally and can be inspected via `getErrorStats()`.
 
@@ -104,6 +182,65 @@ The parser behavior is data-driven:
 In short: code provides the parsing engine, CSV files provide most of the vocabulary and transformation knowledge.
 
 All `rules.csv` examples are regression-tested in [src/test/java/de/ddb/labs/timeparser/TimeParserTest.java](src/test/java/de/ddb/labs/timeparser/TimeParserTest.java).
+
+### rules.csv format
+
+Each row has eight columns (the first row is a header and is skipped):
+
+| Column | Name | Description |
+|--------|------|-------------|
+| 0 | Input mask | Character-by-character type annotation for the input string |
+| 1 | Input pattern | Concrete variable names aligned with the mask |
+| 2 | Input example | A sample input string that must match and parse correctly |
+| 3 | Output mask | Character-by-character type annotation for the output string |
+| 4 | Output pattern | Concrete variable names aligned with the output mask |
+| 5 | Output example | Expected result of applying this rule to the input example |
+| 6 | Test | `NA` (currently unused) |
+| 7 | Output example ISO | Optional. If non-empty: expected `startDate/endDate` from the full pipeline as ISO-8601 dates, separated by `/` |
+
+### Mask and pattern syntax
+
+Every rule defines its input and output through a *mask* and a *pattern* of identical length.
+The mask character at each position determines the token type; the pattern character at the same position names the variable or reproduces the literal text.
+
+**Token types**
+
+| Mask char | Pattern char | Token type | Description |
+|-----------|-------------|------------|-------------|
+| `#` | any letter (except `M`, `G`) | Generic variable | Matches exactly one digit in the input. All consecutive `#` positions with the same pattern letter form one variable. No two variables in the same input specification may share the same initial letter. |
+| `M` + `M` | two identical letters | Month variable | A two-character pair of `M` in the mask captures the two-character month token produced by Step 2. |
+| `G` + `G` | two identical letters | Weekday variable | A two-character pair of `G` in the mask captures the two-character weekday token produced by Step 2. |
+| any other char | same char | Literal text | Mask and pattern character must be identical. The mask character is used verbatim during input matching. |
+
+> **Key constraint — mask matching:** `#` accepts any digit; literal characters must match exactly; spaces must align with spaces. This is enforced by `isMatching()` in `TimeParser`.
+
+> **Key constraint — duplicate variable initials:** Within a single input specification, no two variables may begin with the same letter. This is enforced when the pattern is parsed (output specifications may repeat variable initials, e.g. the same year variable `JJJJ` used in both start and end of a range).
+
+**Variable naming conventions** (the specific letters are free to choose, but the following names are used consistently throughout `rules.csv`):
+
+| Pattern letters | Meaning |
+|-----------------|---------|
+| `JJJJ` | 4-digit year |
+| `XXXX`, `ZZZZ`, `YYYY` | Second/third year in a range |
+| `TT` | 2-digit day |
+| `XX` | Second day in a range |
+| `MM` | Month variable (2-char month token, must use mask `MM`) |
+| `YY` | Second month in a range (must use mask `MM`) |
+| `GG` | Weekday variable (2-char weekday token, must use mask `GG`) |
+
+**Example**
+
+Input `März 2010` is tokenized by Step 2 to `MM 2010`. The matching rule is:
+
+```
+input  mask:    MM ####
+input  pattern: MM JJJJ
+output mask:    ####-##
+output pattern: JJJJ-MM
+```
+
+The parser reads two tokens from the input: `MM` → month variable with value `März` (resolved to `03` during output), `JJJJ` → year variable with value `2010`.
+The output template produces `2010-03`.
 
 ## Semantics and limits
 
