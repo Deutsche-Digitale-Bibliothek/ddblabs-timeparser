@@ -48,13 +48,13 @@ import org.junit.jupiter.api.Test;
 public class TimeParserTest {
 
     @Test
-    @DisplayName("Parses canonical ISO-like input into facet and day-range payload")
+    @DisplayName("[Steps 1-6] Parses canonical ISO-like input into facet and day-range payload")
     public void parsesSimpleInput() {
         assertEquals("time_18000 -5583373|-5583373", TimeParser.getInstance().parseTime("-20000-02-21"));
     }
 
     @Test
-    @DisplayName("Supports legacy day-index output via explicit parse overload")
+    @DisplayName("[Step 6b] Supports legacy day-index output via explicit parse overload")
     public void parsesSimpleInputWithLegacyIndexDaysMode() {
         assertEquals(
             "time_18000 -7304949|-7304949",
@@ -62,7 +62,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Applies BC era suffix to both range boundaries")
+    @DisplayName("[Step 5] Applies BC era suffix to both range boundaries")
     public void parsesBcDateSuffixForWholeRange() {
         final TimeSpan timeSpan = new TimeSpanParser().parse("100/101 vor Christus");
 
@@ -71,7 +71,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Exposes structured parse result metadata for successful parsing")
+    @DisplayName("[Steps 1-6] Exposes structured parse result metadata for successful parsing")
     public void exposesStructuredParseResult() {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("-20000-02-21");
 
@@ -91,7 +91,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Exposes structured failure metadata instead of only an empty string")
+    @DisplayName("[Steps 1-6] Exposes structured failure metadata instead of only an empty string")
     public void exposesStructuredFailureResult() {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("1000000000");
 
@@ -103,7 +103,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Uses explicit ISO field names in successful HTTP JSON")
+    @DisplayName("[HTTP] Uses explicit ISO field names in successful HTTP JSON")
     public void usesExplicitIsoFieldNamesInHttpJson() throws Exception {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("Mai 2010");
         final ObjectMapper objectMapper = TimeParserHttpServer.createObjectMapper();
@@ -117,7 +117,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Omits empty metadata fields from HTTP failure JSON")
+    @DisplayName("[HTTP] Omits empty metadata fields from HTTP failure JSON")
     public void omitsEmptyFieldsFromHttpFailureJson() throws Exception {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("200 V.Vh");
         final ObjectMapper objectMapper = TimeParserHttpServer.createObjectMapper();
@@ -133,7 +133,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Normalizes BCE abbreviation variants before rule matching")
+    @DisplayName("[Step 1] Normalizes BCE abbreviation variants before rule matching")
     public void normalizesBceAbbreviationVariants() {
         final TimeParser parser = TimeParser.getInstance();
         final String expected = parser.parseTime("-200000000");
@@ -146,7 +146,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Parses and generates the largest supported positive year")
+    @DisplayName("[Steps 5-6] Parses and generates the largest supported positive year")
     public void parsesMaximumSupportedPositiveYear() {
         final TimeSpan timeSpan = new TimeSpanParser().parse("999999999");
 
@@ -156,7 +156,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Parses and generates the largest supported BCE year in current negative notation")
+    @DisplayName("[Steps 5-6] Parses and generates the largest supported BCE year in current negative notation")
     public void parsesMaximumSupportedNegativeYearOfEra() {
         final TimeSpan timeSpan = new TimeSpanParser().parse("-1000000000");
 
@@ -166,7 +166,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Normalizes large-number unit variants before rule matching")
+    @DisplayName("[Step 1] Normalizes large-number unit variants before rule matching")
     public void normalizesLargeNumberUnitVariants() {
         final TimeParser parser = TimeParser.getInstance();
 
@@ -188,7 +188,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Parses million-year past expressions through rules.csv normalization")
+    @DisplayName("[Steps 1-4] Parses million-year past expressions through rules.csv normalization")
     public void parsesMillionYearPastExpressions() {
         final TimeParser parser = TimeParser.getInstance();
 
@@ -197,7 +197,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Parses million-year future expressions while resulting year stays within LocalDate range")
+    @DisplayName("[Steps 1-4] Parses million-year future expressions while resulting year stays within LocalDate range")
     public void parsesMillionYearFutureExpressionsWithinRange() {
         final TimeParser parser = TimeParser.getInstance();
 
@@ -206,28 +206,28 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Returns empty output for years outside LocalDate range")
+    @DisplayName("[Step 5] Returns empty output for years outside LocalDate range")
     public void returnsEmptyStringForYearsOutsideSupportedRange() {
         assertEquals("", TimeParser.getInstance().parseTime("1000000000"));
         assertEquals("", TimeParser.getInstance().parseTime("-1000000001"));
     }
 
     @Test
-    @DisplayName("Returns empty output when million-year future expressions exceed LocalDate range")
+    @DisplayName("[Steps 1, 5] Returns empty output when million-year future expressions exceed LocalDate range")
     public void returnsEmptyStringForUnsupportedFutureMillionYearExpressions() {
         assertEquals("", TimeParser.getInstance().parseTime("in 1000 Mio Jahren"));
         assertEquals("", TimeParser.getInstance().parseTime("in 1000 Millionen Jahren"));
     }
 
     @Test
-    @DisplayName("Returns empty output for billion-year expressions because the resulting year exceeds LocalDate range")
+    @DisplayName("[Steps 1, 5] Returns empty output for billion-year expressions because the resulting year exceeds LocalDate range")
     public void returnsEmptyStringForUnsupportedBillionYearExpressions() {
         assertEquals("", TimeParser.getInstance().parseTime("vor 1 Billion Jahren"));
         assertEquals("", TimeParser.getInstance().parseTime("in 1 Billionen Jahren"));
     }
 
     @Test
-    @DisplayName("Rejects disjoint spans instead of silently collapsing semantics")
+    @DisplayName("[Step 5] Rejects disjoint spans instead of silently collapsing semantics")
     public void rejectsDisjointTimeSpans() {
         final IllegalStateException exception = assertThrows(IllegalStateException.class,
             () -> new TimeSpanParser().parse("1944/1945,1949"));
@@ -236,13 +236,13 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Returns empty output for null input on fail-safe API")
+    @DisplayName("[Guard] Returns empty output for null input on fail-safe API")
     public void returnsEmptyStringForNullInput() {
         assertEquals("", TimeParser.getInstance().parseTime(null));
     }
 
     @Test
-    @DisplayName("Rejects oversized inputs before expensive normalization and parsing")
+    @DisplayName("[Guard] Rejects oversized inputs before expensive normalization and parsing")
     public void rejectsOversizedInputEarly() {
         final String input = "x".repeat(5000);
 
@@ -254,13 +254,13 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Returns empty output for unsupported disjoint expressions")
+    @DisplayName("[Step 5] Returns empty output for unsupported disjoint expressions")
     public void returnsEmptyStringForUnsupportedDisjointInput() {
         assertEquals("", TimeParser.getInstance().parseTime("1944-1945/1949", "solr-doc-42"));
     }
 
     @Test
-    @DisplayName("Tracks aggregated parser errors with contextual metadata")
+    @DisplayName("[Diagnostics] Tracks aggregated parser errors with contextual metadata")
     public void exposesAggregatedErrorStats() {
         final TimeParser parser = TimeParser.getInstance();
         final Map<String, ParseErrorStats> beforeStats = parser.getErrorStats();
@@ -279,7 +279,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Resets aggregated parser error counters to a clean state")
+    @DisplayName("[Diagnostics] Resets aggregated parser error counters to a clean state")
     public void resetsAggregatedErrorStats() {
         final TimeParser parser = TimeParser.getInstance();
         parser.parseTime("1944-1945/1949", "solr-doc-reset");
@@ -292,7 +292,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Captures parse error stats safely during concurrent parsing")
+    @DisplayName("[Diagnostics] Captures parse error stats safely during concurrent parsing")
     public void capturesErrorStatsDuringConcurrentParsing() throws Exception {
         final TimeParser parser = TimeParser.getInstance();
         parser.resetErrorStats();
@@ -327,7 +327,7 @@ public class TimeParserTest {
     }
 
     @Test
-    @DisplayName("Validates every rules.csv input example against expected output example")
+    @DisplayName("[Steps 1-4] Validates every rules.csv input example against expected output example")
     public void allRuleInputExamplesMatchOutputExamples() throws Exception {
         final List<RuleCsvEntry> entries = loadRulesCsvEntries();
         final PatternParser patternParser = new PatternParser();
@@ -340,7 +340,8 @@ public class TimeParserTest {
             try {
             final List<Token> inputPattern = patternParser.parse(entry.inputMask, entry.inputPattern);
             final InputParser inputParser = new InputParser(inputPattern, monthReplacements(), weekdayReplacements());
-            final List<TokenWithValue> parsedInputTokens = inputParser.parseInputString(entry.inputExample);
+            final String normalizedExample = TimeParser.getInstance().applyNormalizationRules(entry.inputExample);
+            final List<TokenWithValue> parsedInputTokens = inputParser.parseInputString(normalizedExample);
 
             final List<Token> outputPattern = patternParser.parse(true, entry.outputMask, entry.outputPattern);
                 actualOutput = new Outputter(outputPattern).createOutputString(parsedInputTokens);
@@ -360,6 +361,58 @@ public class TimeParserTest {
 
         System.out.println("[rules.csv] validation complete: " + validatedRules + " rules checked");
         assertTrue(validatedRules > 0);
+    }
+
+    @Test
+    @DisplayName("[Steps 1-5] Validates every rules.csv ISO example against full TimeParser pipeline")
+    public void allRuleIsoExamplesMatchTimeSpan() throws Exception {
+        final List<RuleCsvEntry> entries = loadRulesCsvEntries().stream()
+            .filter(e -> e.outputExampleIso != null && !e.outputExampleIso.isEmpty())
+            .collect(java.util.stream.Collectors.toList());
+        System.out.println("[rules.csv] validating " + entries.size() + " ISO examples");
+        assertTrue(entries.size() > 0,
+            "No ISO examples found in rules.csv — add 'output example ISO' values to test the full pipeline");
+
+        int validated = 0;
+        for (final RuleCsvEntry entry : entries) {
+            final ParseResult result = TimeParser.getInstance().parseTimeResult(entry.inputExample);
+            assertTrue(result.isSuccessful(),
+                "Parse failed for \"" + entry.inputExample + "\" (line " + entry.lineNumber + "): "
+                + result.getErrorType() + ": " + result.getErrorMessage());
+
+            final String[] parts = entry.outputExampleIso.split("/", 2);
+            final LocalDate expectedStart = LocalDate.parse(parts[0]);
+            final LocalDate expectedEnd = parts.length == 2 ? LocalDate.parse(parts[1]) : expectedStart;
+
+            assertEquals(expectedStart, result.getTimeSpan().getStartDate(),
+                "Start date mismatch (line " + entry.lineNumber + ", input: \"" + entry.inputExample + "\")");
+            assertEquals(expectedEnd, result.getTimeSpan().getEndDate(),
+                "End date mismatch (line " + entry.lineNumber + ", input: \"" + entry.inputExample + "\")");
+            validated++;
+        }
+        System.out.println("[rules.csv] ISO validation complete: " + validated + " examples checked");
+    }
+
+    @Test
+    @DisplayName("[Steps 1-2] Validates every rules.csv tokenized example against normalization and month/weekday tokenization")
+    public void allRuleTokenizedExamplesMatchStep2() throws Exception {
+        final List<RuleCsvEntry> entries = loadRulesCsvEntries();
+        final int totalRules = entries.size();
+        System.out.println("[rules.csv] validating " + totalRules + " tokenized examples");
+
+        int validated = 0;
+        for (final RuleCsvEntry entry : entries) {
+            if (entry.tokenizedExample == null || entry.tokenizedExample.isEmpty()) {
+                continue;
+            }
+            final String normalized = TimeParser.getInstance().applyNormalizationRules(entry.inputExample);
+            final String actual = TimeParser.getInstance().tokenizeMonthsAndWeekdays(normalized);
+            assertEquals(entry.tokenizedExample, actual,
+                "Tokenized example mismatch (line " + entry.lineNumber + ", input: \"" + entry.inputExample + "\")");
+            validated++;
+        }
+        System.out.println("[rules.csv] tokenized validation complete: " + validated + " examples checked");
+        assertEquals(totalRules, validated, "Not all rules have a tokenized example");
     }
 
     private String buildRuleFailureMessage(final RuleCsvEntry entry, final String actualOutput, final Exception exception) {
@@ -400,8 +453,10 @@ public class TimeParserTest {
         try (CSVParser parser = CSVParser.parse(new InputStreamReader(inputStream, StandardCharsets.UTF_8), format)) {
             for (final CSVRecord record : parser) {
                 final int lineNumber = Math.toIntExact(record.getRecordNumber() + 1);
-                assertTrue(record.size() >= 7, "Expected at least 7 columns in rules.csv at line " + lineNumber);
+                assertTrue(record.size() >= 8, "Expected at least 8 columns in rules.csv at line " + lineNumber);
 
+                // col 0=inputMask, 1=inputPattern, 2=inputExample, 3=tokenizedExample,
+                // col 4=outputMask, 5=outputPattern, 6=outputExample, 7=outputExampleIso
                 entries.add(new RuleCsvEntry(
                     lineNumber,
                     record.get(0),
@@ -409,7 +464,9 @@ public class TimeParserTest {
                     record.get(2),
                     record.get(3),
                     record.get(4),
-                    record.get(5)));
+                    record.get(5),
+                    record.get(6),
+                    record.get(7).trim()));
             }
         }
         return entries;
@@ -429,8 +486,10 @@ public class TimeParserTest {
         private final String inputMask;
         private final String inputPattern;
         private final String inputExample;
+        private final String tokenizedExample;
         private final String outputMask;
         private final String outputPattern;
         private final String outputExample;
+        private final String outputExampleIso;
     }
 }
