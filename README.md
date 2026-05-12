@@ -143,6 +143,46 @@ long endDay   = p.computeIndexDay(end,   TimeParser.IndexDaysMode.JULIAN_DAY);
 
 For end-to-end parsing without inspecting intermediate steps, use `parseTimeResult(...)` which returns all of the above fields pre-computed in a single `ParseResult`.
 
+### Step 5: valid `transformedInput` expressions
+
+Every output mask in rules.csv must produce a string that `TimeSpanParser` (Step 5) can parse. Valid expressions follow this grammar (verified against current source):
+
+```
+complex  :=  simple "/" complex         -- continuous span: start of first to end of last
+          |  simple "," complex         -- throws DISJOINT_TIME_SPAN
+          |  simple " oder " complex    -- throws DISJOINT_TIME_SPAN
+          |  simple
+
+simple   :=  rangeModifier " " date
+          |  date
+
+rangeModifier
+         :=  "ab" | "seit"       -- from this date onwards
+          |  "bis"                -- up to this date
+          |  "vor"                -- before this date
+          |  "nach"               -- after this date
+          |  "um" | "ca."         -- around (± year-dependent delta, see getAroundDelta())
+          |  "vermutlich"         -- presumably this date (no range expansion)
+
+date     :=  [limitation " "] digit+ ". Jahrhundert" [" vor/nach Christus"]
+          |  "-" yearMonthDay     -- BCE date
+          |  yearMonthDay
+
+yearMonthDay
+         :=  digit+ "-" digit{2} "-" digit{2}   -- full date
+          |  digit+ "-" digit{2}                -- year-month
+          |  digit+                             -- year only
+
+limitation (century qualifier)
+         :=  digit+ ". Dekade" | digit+ ". Viertel"
+          |  digit+ ". Drittel" | digit+ ". Hälfte"
+          |  "Anfang" | "Mitte" | "Ende"
+```
+
+The `/` operator creates a **continuous span** from the start of the first date to the end of the last (e.g. `1911/1914` → 1911-01-01/1914-12-31). The `,` and ` oder ` operators are syntactically parsed but always throw `DISJOINT_TIME_SPAN` — they appear in rule outputs that represent forms the step-5 parser cannot combine (e.g. `1944/1945,1949` from the rule matching `1944-1945/1949`).
+
+Not supported by `TimeSpanParser`: `Jahrtausend`, `zwischen X und Y`, `nicht datiert` / `undatiert` / `ohne Datum`.
+
 ## Structured API
 
 Available overloads:
@@ -161,7 +201,7 @@ ParseResult parseTimeResult(String input, String contextId, IndexDaysMode mode)
 
 Useful `ParseResult` fields:
 
-- `normalizedInput` — after step 1
+- `normalizedInput` — after steps 1 and 2 (normalization + month/weekday tokenization)
 - `matchingRules` / `matchedRule` — after step 3
 - `transformedInput` — after step 4
 - `timeSpan` — after step 5
@@ -233,12 +273,10 @@ A few important caveats:
 
 - the parser is optimized for historical and catalog-style date strings, not arbitrary natural language
 - exactly one rule must match after normalization; ambiguous inputs are rejected
-- disjoint expressions such as `1944/1945,1949` are currently rejected
-- very large years are bounded by `java.time.LocalDate`
-- inputs up to `999999999` and `-1000000000` are supported in the current implementation; larger magnitudes return `""` through the fail-safe API
+- the `/` operator creates a continuous span from the start of the first date to the end of the last (e.g. `1911/1914` = 1911 to 1914); `,` and ` oder ` always throw `DISJOINT_TIME_SPAN`
+- year range is `-1000000000` to `999999999` (bounded by `java.time.LocalDate`); larger magnitudes return `""` through the fail-safe API
 - the fail-safe `parseTime(...)` methods return `""` on errors; if you need diagnostics, use `parseTimeResult(...)`
 - request input is intentionally capped at 2048 characters to protect the parser from excessive memory and CPU pressure
-- diagnostic logging and stored error-stat values are abbreviated to keep monitoring data bounded
 
 ## HTTP demo server
 

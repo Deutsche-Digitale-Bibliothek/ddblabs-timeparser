@@ -61,22 +61,11 @@ Alle aktiven Step-1-Gruppen in der Reihenfolge, in der sie in normalizations.csv
 
 ## Design-Prinzip: Normalisierung statt Regeln
 
-**Grundregel:**
+Schreibvarianten **ohne semantischen Unterschied** → Normalisierungszeile in normalizations.csv. Varianten **mit unterschiedlichem Ausgabeverhalten** → separate Regel in rules.csv.
 
-- **Normalisierung** verwenden bei reinen Schreibvarianten **ohne semantischen Unterschied** — z. B. `Febr.` und `Feb.` bedeuten dasselbe, `wahrscheinlich` und `circa` stehen für denselben Näherungsbereich.
-- **Separate Regel** in rules.csv verwenden, wenn Varianten **unterschiedliche Ausgaben** erzeugen sollen — z. B. `ca. 1850` (±1 Jahr) vs. `um 1850` (±5 Jahre).
+Praxis: 11 Synonyme für `circa` (etwa, wohl, vermutlich, …) werden durch 11 Normalisierungszeilen abgedeckt — die 21 bestehenden `circa`-Regeln greifen damit automatisch für alle Synonyme, ohne eine einzige neue Zeile in rules.csv.
 
-**Konkret:** Statt 11 separate Regeleinträge für `wohl ####`, `etwa ####`, `vermutlich ####` usw. anzulegen, normalisieren 11 Zeilen in normalizations.csv alle diese Formen zu `circa`. Damit greifen die bestehenden 21 `circa`-Regeln automatisch für alle Synonyme — ohne eine einzige neue Zeile in rules.csv.
-
-### Konsequenz für rules.csv: Eingabemaske muss kanonische Form verwenden
-
-Wenn eine Normalisierung einen Begriff verändert, **muss die Eingabemaske der Regel die kanonische Form** (also den Wert nach der Normalisierung) enthalten. Das Eingabebeispiel (Spalte 2) darf weiterhin die Originalform zeigen; das tokenisierte Beispiel (Spalte 3) zeigt den Zustand nach der Normalisierung.
-
-Beispiel: Die Regel für `s.a. [vermutlich 1850]`:
-- Normalisierung Step 1: `vermutlich` → `circa`
-- Eingabemaske (Spalte 0): `s.a. [circa ####]` ← kanonische Form
-- Eingabebeispiel (Spalte 2): `s.a. [vermutlich 1850]` ← Originalform, unverändert
-- Tokenisiertes Beispiel (Spalte 3): `s.a. [circa 1850]` ← Zustand nach Step 1+2
+**Eingabemaske muss die kanonische Post-Normalisierungs-Form enthalten.** Wenn Step 1 `vermutlich` → `circa` wandelt, lautet die Eingabemaske `s.a. [circa ####]`. Das Eingabebeispiel (Spalte 2) darf die Originalform `s.a. [vermutlich 1850]` zeigen; Spalte 3 (tokenized) zeigt `s.a. [circa 1850]`.
 
 ---
 
@@ -99,14 +88,23 @@ Die tatsächliche Breite der Zeitspanne hängt vom **Zeitalter der Jahreszahl** 
 
 ### Wie Eingabeformen auf Ausgabe-Token abgebildet werden
 
-| Eingabe (nach Normalisierung) | rules.csv-Output | TimeSpanParser-Token |
-|-------------------------------|------------------|----------------------|
-| `[ca. ####]` | `ca. ####` (Klammern entfernt) | `ca.` → AROUND |
-| `circa ####` | `ca. ####` (`circa` → `ca.`) | `ca.` → AROUND |
-| `[circa ####]` | `ca. ####` | `ca.` → AROUND |
-| `um ####` | `um ####` | `um` → AROUND |
+| Eingabe (nach Step 1+2) | rules.csv-Output | TimeSpanParser-Token | Effekt |
+|-------------------------|------------------|----------------------|--------|
+| `[ca. ####]` | `ca. ####` (Klammern entfernt) | `ca.` → AROUND | Zeitraum ausgedehnt (±N Jahre) |
+| `circa ####` | `ca. ####` (`circa` → `ca.`) | `ca.` → AROUND | Zeitraum ausgedehnt |
+| `[circa ####]` | `ca. ####` | `ca.` → AROUND | Zeitraum ausgedehnt |
+| `um ####` | `um ####` | `um` → AROUND | Zeitraum ausgedehnt |
+| `[####?]`, `[i.e. ####?]`, `[um ####?]` | `vermutlich ####` | `vermutlich` → PRESUMABLY | **kein Ausdehnen** — exakte Jahreszahl |
 
-**Die eckigen Klammern in der Eingabe** (z. B. `[ca. 1965]`, `[circa 1533]`) sind reine Eingabe-Konventionen im Quellmaterial; rules.csv entfernt sie. Sie haben keinen Einfluss auf den Näherungsbereich — der hängt allein vom Jahr ab.
+Ausdehnung: `ca.` und `um` verwenden dieselbe `getAroundDelta()`-Methode (±1/2/5/10 Jahre je nach Zeitalter — siehe Tabelle oben). Die eckigen Klammern in der Eingabe sind Quellmaterial-Konventionen; rules.csv entfernt sie.
+
+**Hinweis: zwei verschiedene Rollen von `vermutlich`**
+
+`vermutlich` erscheint im System in zwei unabhängigen Kontexten:
+
+1. **Als Wort im Eingabe-String** (Step 1, normalizations.csv): `vermutlich 1850` → normalisiert zu `circa 1850` → Regel `circa ####` greift → Output `ca. 1850` → AROUND → Zeitraum wird ausgedehnt.
+
+2. **Als Output-Token in rules.csv**: Eingaben wie `[1868?]` oder `[um 1470?]` enthalten das Wort `vermutlich` **nicht** — es entsteht erst als Regelausgabe (`vermutlich 1868`). TimeSpanParser erkennt `vermutlich` als PRESUMABLY-Marker → **keine Ausdehnung** → exakt ein Jahreszeitraum (`1868-01-01/1868-12-31`). Das Fragezeichen in Klammern drückt quellkritische Unsicherheit ohne implizierte Zeitbreite aus.
 
 ### Cluster `circa` — normalisierte Synonyme
 
@@ -121,22 +119,15 @@ Die folgenden Schreibvarianten werden in Step 1 zu `circa` normalisiert. Rules.c
 | `ungefähr`, `ungef.`                     | `circa`  | Synonym |
 | `vorwiegend`, `vorw.`                    | `circa`  | Synonym |
 
-### Nicht normalisiert
+### Nicht normalisiert: `um` und `ca.`
 
-- **`um`** bleibt eigenständig — eigene Regelgruppe in rules.csv, produziert `um X`-Output statt `ca. X`.
-- **`ca.`** bleibt eigenständig — eigene Regelgruppe.
+`um` und `ca.` bleiben eigenständige Regelgruppen — unterschiedliche Output-Token, unterschiedliche Ausgabedarstellung (`um 1865` vs. `ca. 1865`). AROUND-Näherungsbereich ist epochenabhängig und für beide identisch (beide → `getAroundDelta()`).
 
-Der Näherungsbereich von `um` und `ca.` ist bei gleichem Jahreszahlbereich identisch (beide → AROUND → `getAroundDelta()`). Sie sind trotzdem separate Regelgruppen, weil die Eingabeformen in Quellmaterialien semantisch unterschiedlich benutzt werden und die Ausgabedarstellung sich unterscheidet (`ca. 1865` vs. `um 1865`).
-
-### Neue Synonyme hinzufügen
-
-Soll ein weiteres Synonym zu `circa` hinzugefügt werden (z. B. `möglicherweise`):
+Neues Synonym zu `circa` hinzufügen — nur eine normalizations.csv-Zeile, keine rules.csv-Änderung nötig:
 
 ```csv
 (?i)\bmöglicherweise\b,circa,normalization,normalize uncertainty marker 'möglicherweise' to canonical form 'circa'
 ```
-
-Keine Änderung in rules.csv nötig.
 
 ---
 
@@ -166,7 +157,7 @@ Teil 2 1975   →  1975
 
 Das Muster greift für `Band`, `Bd.`, `Bd`, `Nummer`, `Nr.`, `Nr`, `Teil` gefolgt von einer 1–3-stelligen Zahl.
 
-**Hinweis:** Regeln, deren Eingabemaske mit `Nr.` als strukturellem Bestandteil eines Formats beginnt (z. B. `Nr. #.#### -`), sind davon nicht betroffen, sofern die Zahl nach `Nr.` im Eingabebeispiel Teil eines Datumscodes ist (z. B. `Nr. 1.2011 -`, wo `1.2011` eine laufende-Nummer-plus-Jahr-Struktur darstellt).
+**Ausnahme:** Die Regex greift nur auf isolierte Nummern (1–3 Stellen, Wortgrenze). Regeln mit `Nr.` als Format-Bestandteil (z. B. `Nr. #.#### -`) sind nicht betroffen.
 
 ---
 
@@ -200,20 +191,27 @@ CSV, 8 Spalten:
 | 6      | `output example`      | Konkretes Ausgabebeispiel |
 | 7      | `output example ISO`  | ISO-8601-Ausgabe (`YYYY-MM-DD/YYYY-MM-DD`); leer wenn keine direkte ISO-Entsprechung (z. B. Kommalisten) |
 
-### Masken- und Mustersyntax
+**Masken- und Mustersyntax:** → [„Mask and pattern syntax" in der Root-README](../../../../../README.md#mask-and-pattern-syntax).
 
-- `#` = eine beliebige Ziffer; **gleicher Buchstabe = gleiche Zahl**: z. B. `##` steht für zwei Ziffern, die zusammen eine Zahl bilden
-- `MM` = Monat-Token (zweistellige Nummer `01`–`12`, aus Step 2)
-- `GG` = Wochentag-Token (aus Step 2)
-- Alle anderen Zeichen = Literal (muss exakt übereinstimmen)
+**Spalte 3 (`tokenized example`):** Zustand der Eingabe nach Step 1+2; leer wenn identisch mit Spalte 2. Wird durch den Test `allRuleTokenizedExamplesMatchStep2` geprüft.
 
-Variablennamen (Großbuchstaben) im Pattern sind frei wählbar. Im **Eingabemuster** darf ein Buchstabe nicht mehrfach verwendet werden (jede Variable ist eindeutig und repräsentiert eine eigenständige Zahl). Im **Ausgabemuster** sind Wiederholungen erlaubt — z. B. erscheint `JJJJ` zweimal, wenn Anfangs- und Endjahr identisch sein sollen.
+---
 
-### Spalte 3: `tokenized example`
+## Noch nicht unterstützt
 
-Zeigt, wie die Eingabe nach Step 1 (Normalisierung) und Step 2 (Tokenisierung) aussieht. Dient als maschinenlesbare Prüfgrundlage: Der Test `allRuleTokenizedExamplesMatchStep2` wendet die Pipeline bis Step 2 an und vergleicht mit diesem Feld.
+Folgende Datumsformen sind in `TimeSpanParser` nicht implementiert:
 
-Das Feld ist **leer**, wenn die normalisierte/tokenisierte Form identisch mit Spalte 2 (`input example`) ist.
+| Form | Beschreibung | Workaround |
+|------|--------------|------------|
+| `Jahrtausend` | z. B. „2. Jahrtausend" | — |
+| `zwischen X und Y` | Explizite `zwischen`-Form | Output `X/Y` in rules.csv |
+| `nicht datiert`, `undatiert`, `ohne Datum` | Explizit undatierte Objekte | — |
+| `DD.MM.YYYY`, `YYYY/MM/DD` | Weitere Datumsformat-Varianten | rules.csv-Regel mit Output `YYYY-MM-DD` |
+
+Gegenüber der ursprünglichen Spezifikation **inzwischen über rules.csv implementiert**:
+
+- `?`-Notation: z. B. `1965?` → `ca. 1965`, `[1868?]` → `vermutlich 1868`, `1923 ?` → `ca. 1923`
+- Monat- und Wochentagserkennung: früher im Java-Code hardcodiert, jetzt konfigurierbar über normalizations.csv
 
 ---
 
