@@ -18,7 +18,7 @@ from,to,type,comment
 (?i)\bungef\.,circa,normalization,normalize uncertainty marker 'ungef.' to canonical form 'circa'
 (?i)\bvorwiegend\b,circa,normalization,normalize uncertainty marker 'vorwiegend' to canonical form 'circa'
 (?i)\bvorw\.,circa,normalization,normalize uncertainty marker 'vorw.' to canonical form 'circa'
-(?i)\b(?:Band|Bd\.|Bd|Nummer|Nr\.|Nr|Teil)\s+\d{1,3}\b,,normalization,strip volume/number annotations before dates (e.g. 'Bd. 1 1950' -> '1950'; 'Nr. 3 1960' -> '1960')
+"(?i)\b(?:Band|Bd\.|Bd|Nummer|Nr\.|Nr|Teil)\s+\d{1,3}\b",,normalization,strip volume/number annotations before dates (e.g. 'Bd. 1 1950' -> '1950'; 'Nr. 3 1960' -> '1960')
 Januar,01,month,full month name
 Jänner,01,month,full month name
 Februar,02,month,full month name
