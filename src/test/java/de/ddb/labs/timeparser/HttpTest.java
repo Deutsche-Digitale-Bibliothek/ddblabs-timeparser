@@ -15,11 +15,11 @@
  */
 package de.ddb.labs.timeparser;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.ddb.labs.timeparser.http.HttpParseResponse;
 import de.ddb.labs.timeparser.model.ParseResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,7 +37,7 @@ public class HttpTest {
     @DisplayName("[HTTP] Erfolgreiche Antwort enthält ISO-Feldnamen statt Java-Property-Namen")
     public void usesExplicitIsoFieldNamesInHttpJson() throws Exception {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("Mai 2010");
-        final ObjectMapper objectMapper = TimeParserHttpServer.createObjectMapper();
+        final JsonMapper objectMapper = TimeParserHttpServer.createObjectMapper();
 
         final String json = objectMapper.writeValueAsString(HttpParseResponse.from(result));
 
@@ -51,7 +51,7 @@ public class HttpTest {
     @DisplayName("[HTTP] Fehlerhafte Antwort lässt leere Metadatenfelder weg")
     public void omitsEmptyFieldsFromHttpFailureJson() throws Exception {
         final ParseResult result = TimeParser.getInstance().parseTimeResult("200 V.Vh");
-        final ObjectMapper objectMapper = TimeParserHttpServer.createObjectMapper();
+        final JsonMapper objectMapper = TimeParserHttpServer.createObjectMapper();
 
         final String json = objectMapper.writeValueAsString(HttpParseResponse.from(result));
 

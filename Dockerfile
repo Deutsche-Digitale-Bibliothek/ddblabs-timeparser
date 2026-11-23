@@ -1,21 +1,23 @@
-FROM maven:3-eclipse-temurin-21 AS build
+FROM maven:3-amazoncorretto-25 AS build
 WORKDIR /workspace
 
-COPY pom.xml mvnw ./
+COPY pom.xml ./
 COPY .mvn .mvn
 COPY src src
 
-RUN chmod +x mvnw \
-	&& MAVEN_CONFIG='' ./mvnw -q -DskipTests package \
+RUN mvn -q -DskipTests package \
 	&& cp target/*-shaded.jar target/timeparser.jar
 
-FROM eclipse-temurin:21-jre-jammy
+FROM amazoncorretto:25
 WORKDIR /app
 
 ENV TIMEPARSER_HOST=0.0.0.0
 ENV TIMEPARSER_PORT=8080
 
-RUN groupadd --system app && useradd --system --gid app --create-home --home-dir /app app
+RUN dnf install -y shadow-utils \
+	&& dnf clean all \
+	&& groupadd --system app \
+	&& useradd --system --gid app --no-create-home --home-dir /app app
 
 COPY --from=build /workspace/target/timeparser.jar /app/timeparser.jar
 

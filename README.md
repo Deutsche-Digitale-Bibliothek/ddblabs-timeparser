@@ -1,6 +1,6 @@
 # timeparser
 
-Java 21 library for turning textual date expressions into machine-readable time spans, sortable day ranges, and DDB facet ids.
+Java 25 library for turning textual date expressions into machine-readable time spans, sortable day ranges, and DDB facet ids.
 
 ## What it does
 
@@ -16,7 +16,7 @@ The `time_XXX` identifiers refer to the DDB Zeitvokabular and are publicly brows
 
 ## Requirements
 
-- Java 21
+- Java 25
 - Maven Wrapper included, or Maven 3.9+
 
 ## Maven

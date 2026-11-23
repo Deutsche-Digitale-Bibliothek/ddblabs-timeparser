@@ -16,9 +16,6 @@
 package de.ddb.labs.timeparser;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.ddb.labs.timeparser.http.HttpParseResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -28,8 +25,11 @@ import java.util.Map;
 import io.javalin.Javalin;
 import io.javalin.compression.CompressionStrategy;
 import io.javalin.http.Header;
-import io.javalin.json.JavalinJackson;
+import io.javalin.json.JavalinJackson3;
 import lombok.extern.slf4j.Slf4j;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Minimal HTTP wrapper exposing {@link TimeParser} via query parameters.
@@ -67,7 +67,7 @@ public final class TimeParserHttpServer {
     private static Javalin createApp() {
         return Javalin.create(config -> {
             config.startup.showJavalinBanner = false;
-            config.jsonMapper(new JavalinJackson(createObjectMapper(), false));
+            config.jsonMapper(new JavalinJackson3(createObjectMapper(), false));
             config.http.defaultContentType = JSON_CONTENT_TYPE;
             config.http.compressionStrategy = CompressionStrategy.GZIP;
             config.http.compressionStrategy.setDefaultMinSizeForCompression(0);
@@ -96,11 +96,14 @@ public final class TimeParserHttpServer {
         });
     }
 
-    protected static ObjectMapper createObjectMapper() {
-        return new ObjectMapper()
-                .registerModule(new JavaTimeModule())
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                .setDefaultPropertyInclusion(JsonInclude.Include.NON_EMPTY);
+    protected static JsonMapper createObjectMapper() {
+        return JsonMapper.builder()
+                .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .changeDefaultPropertyInclusion(inclusion -> inclusion
+                        .withValueInclusion(JsonInclude.Include.NON_EMPTY)
+                        .withContentInclusion(JsonInclude.Include.NON_EMPTY))
+                .build();
     }
 
     private static TimeParser.IndexDaysMode resolveIndexDaysMode(final String primaryValue) {
